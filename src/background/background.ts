@@ -237,10 +237,9 @@ async function refreshErrorsForTab(tabId?: number): Promise<{ success: boolean; 
       return { success: false, errors: [] };
     }
 
-    // Clear existing errors for this tab first
+    // Get existing errors for this tab (don't clear them)
     const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
-    const filteredErrors = errors.filter(e => e.tabId !== tabId);
-    await chrome.storage.local.set({ errors: filteredErrors });
+    const tabErrors = errors.filter(e => e.tabId === tabId);
 
     // Re-inject the FULL content script to setup error capturing
     // This ensures error listeners are active and working
@@ -406,12 +405,19 @@ async function refreshErrorsForTab(tabId?: number): Promise<{ success: boolean; 
       }
     });
 
-    // Return empty errors (fresh start for this tab)
-    updateBadge(0, tabId);
-    return { success: true, errors: [] };
+    // Return existing errors for this tab (not clearing them)
+    updateBadge(tabErrors.length, tabId);
+    return { success: true, errors: tabErrors };
   } catch (err) {
     console.error('DevDebug: Failed to refresh errors:', err);
-    return { success: false, errors: [] };
+    // On error, still try to return existing errors
+    try {
+      const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
+      const tabErrors = errors.filter(e => e.tabId === tabId);
+      return { success: false, errors: tabErrors };
+    } catch {
+      return { success: false, errors: [] };
+    }
   }
 }
 

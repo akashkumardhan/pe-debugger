@@ -44,7 +44,8 @@ export async function clearErrors(tabId?: number): Promise<void> {
 }
 
 /**
- * Refresh errors for a tab - clears existing and re-injects content script
+ * Refresh errors for a tab - re-injects content script and returns current errors
+ * Does NOT clear existing errors - use clearErrors() for that
  * @param tabId - The tab ID to refresh errors for
  */
 export async function refreshErrors(tabId?: number): Promise<{ success: boolean; errors: ConsoleError[] }> {

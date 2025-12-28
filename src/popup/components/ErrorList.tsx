@@ -48,20 +48,27 @@ export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }:
     }
   };
 
-  // Handle refresh - clears and re-fetches errors for current tab
+  // Handle refresh - re-fetches errors for current tab (without clearing)
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Refresh errors (clears existing and re-injects content script)
-      await refreshErrors(currentTabId);
-      // Re-fetch fresh errors after a brief delay to allow content script to capture
-      setTimeout(async () => {
+      // Ensure error capture is active and get current errors for this tab
+      const result = await refreshErrors(currentTabId);
+      if (result.success) {
+        onUpdate(result.errors);
+      } else {
+        // Fallback: fetch errors directly from storage
         const freshErrors = await getErrors(currentTabId);
         onUpdate(freshErrors);
-        setIsRefreshing(false);
-      }, 500);
+      }
     } catch (err) {
       console.error('Failed to refresh errors:', err);
+      // Fallback: try to get errors anyway
+      try {
+        const freshErrors = await getErrors(currentTabId);
+        onUpdate(freshErrors);
+      } catch {}
+    } finally {
       setIsRefreshing(false);
     }
   };
