@@ -10,6 +10,14 @@
 import { toolDefinition } from '@tanstack/ai';
 import * as z from 'zod';
 
+// Import schemas from types
+import {
+  CampaignSchema,
+  SegmentSchema,
+  SiteSchema,
+  SiteSettingsSchema,
+} from './types';
+
 // ============================================================
 // GET SUBSCRIPTION DETAILS TOOL
 // ============================================================
@@ -35,24 +43,47 @@ export const getSubscriptionDetailsDef = toolDefinition({
     success: z.boolean(),
     available: z.boolean().describe('Whether PushEngage SDK is available on the page'),
     data: z.object({
-      siteName: z.string().optional(),
-      siteId: z.number().optional(),
-      siteUrl: z.string().optional(),
-      campaigns: z.object({
-        browseAbandonments: z.number(),
-        cartAbandonments: z.number(),
-        customTriggers: z.number(),
-        activeCampaigns: z.number(),
-      }).optional(),
-      settings: z.object({
-        geoLocationEnabled: z.boolean(),
-        analyticsEnabled: z.boolean(),
-        chickletPosition: z.string(),
-        chickletLabel: z.string(),
-      }).optional(),
-      segments: z.number().optional(),
-      subscriberAttributes: z.number().optional(),
-    }).optional(),
+      backInStockAlerts: z
+        .array(CampaignSchema)
+        .describe('Back-in-stock notification campaigns'),
+
+      browseAbandonments: z
+        .array(CampaignSchema)
+        .describe('Browse abandonment campaigns'),
+
+      cartAbandonments: z
+        .array(CampaignSchema)
+        .describe('Cart abandonment campaigns'),
+
+      chatWidgets: z
+        .array(z.any())
+        .describe('Chat widget configurations'),
+
+      customTriggerCampaigns: z
+        .array(CampaignSchema)
+        .describe('Custom trigger based campaigns'),
+
+      priceDropAlerts: z
+        .array(CampaignSchema)
+        .describe('Price drop alert campaigns'),
+
+      segments: z
+        .array(SegmentSchema)
+        .describe('Audience segmentation rules'),
+
+      site: SiteSchema.describe('Site metadata'),
+
+      siteSettings: SiteSettingsSchema.describe(
+        'Complete site configuration and UI settings'
+      ),
+
+      subscriberAttributes: z
+        .array(z.any())
+        .describe('Custom subscriber attributes'),
+    })
+    .optional()
+    .describe('subscription and site related details and configuration data'),
+
     error: z.string().optional(),
   }),
 });
@@ -201,3 +232,11 @@ export type SaveToStorageOutput = z.infer<typeof saveToStorageDef.outputSchema>;
 
 export type AnalyzeErrorInput = z.infer<typeof analyzeErrorDef.inputSchema>;
 export type AnalyzeErrorOutput = z.infer<typeof analyzeErrorDef.outputSchema>;
+
+// Re-export schemas from types for convenience
+export {
+  CampaignSchema,
+  SegmentSchema,
+  SiteSchema,
+  SiteSettingsSchema,
+} from './types';

@@ -40,6 +40,9 @@ export const getSubscriptionDetailsClient = getSubscriptionDetailsDef.client(
     try {
       const { available, config } = await getPEStatus();
 
+      // console.log('available in the getSubscriptionDetailsClient function: ', available);
+      // console.log('config in the getSubscriptionDetailsClient function: ', config);
+
       if (!available || !config) {
         return {
           success: true,
@@ -49,38 +52,39 @@ export const getSubscriptionDetailsClient = getSubscriptionDetailsDef.client(
         };
       }
 
-      const summary = pushEngageService.parseCampaignSummary(config);
-      const settings = pushEngageService.extractKeySettings(config);
+      // const summary = pushEngageService.parseCampaignSummary(config);
+      // const settings = pushEngageService.extractKeySettings(config);
 
       const result: GetSubscriptionDetailsOutput = {
         success: true,
         available: true,
-        data: {
-          siteName: settings.siteName,
-          siteId: settings.siteId,
-          siteUrl: settings.siteUrl,
-        },
+        data: config,
+        // data: {
+        //   siteName: settings.siteName,
+        //   siteId: settings.siteId,
+        //   siteUrl: settings.siteUrl,
+        // },
       };
 
-      if (input.includeCampaigns && result.data) {
-        result.data.campaigns = {
-          browseAbandonments: summary.browseAbandonments,
-          cartAbandonments: summary.cartAbandonments,
-          customTriggers: summary.customTriggers,
-          activeCampaigns: summary.activeCampaigns,
-        };
-      }
+      // if (input.includeCampaigns && result.data) {
+      //   result.data.campaigns = {
+      //     browseAbandonments: summary.browseAbandonments,
+      //     cartAbandonments: summary.cartAbandonments,
+      //     customTriggers: summary.customTriggers,
+      //     activeCampaigns: summary.activeCampaigns,
+      //   };
+      // }
 
-      if (input.includeSettings && result.data) {
-        result.data.settings = {
-          geoLocationEnabled: settings.geoLocation,
-          analyticsEnabled: settings.analytics,
-          chickletPosition: settings.chickletPosition,
-          chickletLabel: settings.chickletLabel,
-        };
-        result.data.segments = settings.segmentsCount;
-        result.data.subscriberAttributes = settings.attributesCount;
-      }
+      // if (input.includeSettings && result.data) {
+      //   result.data.settings = {
+      //     geoLocationEnabled: settings.geoLocation,
+      //     analyticsEnabled: settings.analytics,
+      //     chickletPosition: settings.chickletPosition,
+      //     chickletLabel: settings.chickletLabel,
+      //   };
+      //   result.data.segments = settings.segmentsCount;
+      //   result.data.subscriberAttributes = settings.attributesCount;
+      // }
 
       return result;
     } catch (error) {

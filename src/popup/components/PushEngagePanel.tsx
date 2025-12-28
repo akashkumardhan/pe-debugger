@@ -93,7 +93,7 @@ export default function PushEngagePanel({
               <RefreshCw size={16} />
             </button>
             <button
-              onClick={() => onQuerySelect('Show me a summary of my PushEngage setup')}
+              onClick={() => onQuerySelect('')}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors"
             >
               <MessageSquare size={14} />
