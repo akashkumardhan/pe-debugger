@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Trash2, Copy, Check, ArrowLeftRight, Bot, User, StopCircle, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
+import { Send, Trash2, Copy, Check, Bot, User, StopCircle, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { ConsoleError, ChatMessage, ApiConfig, PEAppConfig } from '../../types';
 import { useAIChat } from '../hooks/useAIChat';
@@ -22,14 +22,16 @@ interface Toast {
   type: 'success' | 'error' | 'info' | 'warning';
 }
 
+import type { ChatMode } from '../../types';
+
 interface ChatInterfaceProps {
-  mode: 'debug' | 'pushengage';
+  mode: ChatMode;
   selectedError: ConsoleError | null;
   peData: PEAppConfig | null;
   apiConfig: ApiConfig | null;
   messages: ChatMessage[];
   onMessagesChange: (messages: ChatMessage[]) => void;
-  onModeSwitch: () => void;
+  onModeChange: (mode: ChatMode) => void;
 }
 
 export default function ChatInterface({
@@ -39,7 +41,7 @@ export default function ChatInterface({
   apiConfig,
   messages,
   onMessagesChange,
-  onModeSwitch
+  onModeChange
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -127,9 +129,6 @@ export default function ChatInterface({
     );
   }
 
-  // Check if we have specific context for the current mode
-  const hasSpecificContext = mode === 'debug' ? selectedError : peData;
-
   // Toast icon based on type
   const getToastIcon = (type: Toast['type']) => {
     switch (type) {
@@ -162,73 +161,94 @@ export default function ChatInterface({
         </div>
       )}
 
-      {/* Context Header - Shows current mode and context */}
+      {/* Context Header - Mode selector and context */}
       <div className="p-3 border-b bg-white">
-        {mode === 'debug' && selectedError ? (
-          <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-red-800 flex items-center gap-1">
-                🔧 Debug Mode
-              </span>
-              <button
-                onClick={onModeSwitch}
-                className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800"
-              >
-                <ArrowLeftRight size={12} />
-                Switch to PE
-              </button>
+        {/* Mode Radio Buttons */}
+        <div className="flex items-center gap-4 mb-3 pb-3 border-b border-gray-100">
+          <span className="text-xs text-gray-500 font-medium">Mode:</span>
+          <label className="flex items-center gap-1.5 cursor-pointer group">
+            <input 
+              type="radio" 
+              name="chatMode" 
+              value="debug" 
+              checked={mode === 'debug'} 
+              onChange={() => onModeChange('debug')}
+              className="w-3.5 h-3.5 text-red-500 focus:ring-red-500 cursor-pointer"
+            />
+            <span className={`text-xs ${mode === 'debug' ? 'text-red-600 font-semibold' : 'text-gray-600 group-hover:text-gray-800'}`}>
+              🔧 Debug
+            </span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer group">
+            <input 
+              type="radio" 
+              name="chatMode" 
+              value="pushengage" 
+              checked={mode === 'pushengage'} 
+              onChange={() => onModeChange('pushengage')}
+              className="w-3.5 h-3.5 text-indigo-500 focus:ring-indigo-500 cursor-pointer"
+            />
+            <span className={`text-xs ${mode === 'pushengage' ? 'text-indigo-600 font-semibold' : 'text-gray-600 group-hover:text-gray-800'}`}>
+              📊 PushEngage
+            </span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer group">
+            <input 
+              type="radio" 
+              name="chatMode" 
+              value="general" 
+              checked={mode === 'general'} 
+              onChange={() => onModeChange('general')}
+              className="w-3.5 h-3.5 text-blue-500 focus:ring-blue-500 cursor-pointer"
+            />
+            <span className={`text-xs ${mode === 'general' ? 'text-blue-600 font-semibold' : 'text-gray-600 group-hover:text-gray-800'}`}>
+              💬 General
+            </span>
+          </label>
+        </div>
+
+        {/* Context Display based on mode */}
+        {mode === 'debug' ? (
+          selectedError ? (
+            <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+              <p className="text-sm font-mono text-red-900 line-clamp-2">{selectedError.message}</p>
+              <p className="text-xs text-red-600 mt-1">
+                {selectedError.filename}:{selectedError.lineno}
+              </p>
             </div>
-            <p className="text-sm font-mono text-red-900 line-clamp-2">{selectedError.message}</p>
-            <p className="text-xs text-red-600 mt-1">
-              {selectedError.filename}:{selectedError.lineno}
-            </p>
-          </div>
-        ) : mode === 'pushengage' && peData ? (
-          <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-indigo-800 flex items-center gap-1">
-                📊 PushEngage Mode
-              </span>
-              <button
-                onClick={onModeSwitch}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800"
-              >
-                <ArrowLeftRight size={12} />
-                Switch to Debug
-              </button>
+          ) : (
+            <div className="bg-red-50/50 p-3 rounded-lg border border-red-100">
+              <p className="text-xs text-red-600">
+                No error selected. Select an error from the Errors tab to analyze, or ask general debugging questions.
+              </p>
             </div>
-            <p className="text-sm font-semibold text-indigo-900">
-              {peData.site?.site_name || 'Unknown Site'}
-            </p>
-            <p className="text-xs text-indigo-600">{peData.site?.site_url}</p>
-            {/* Show quick stats about PE data available */}
-            <div className="flex gap-2 mt-2 text-[10px] text-indigo-500">
-              <span>{peData.browseAbandonments?.length || 0} browse campaigns</span>
-              <span>•</span>
-              <span>{peData.cartAbandonments?.length || 0} cart campaigns</span>
-              <span>•</span>
-              <span>{peData.segments?.length || 0} segments</span>
+          )
+        ) : mode === 'pushengage' ? (
+          peData ? (
+            <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+              <p className="text-sm font-semibold text-indigo-900">
+                {peData.site?.site_name || 'Unknown Site'}
+              </p>
+              <p className="text-xs text-indigo-600">{peData.site?.site_url}</p>
+              <div className="flex gap-2 mt-2 text-[10px] text-indigo-500">
+                <span>{peData.browseAbandonments?.length || 0} browse campaigns</span>
+                <span>•</span>
+                <span>{peData.cartAbandonments?.length || 0} cart campaigns</span>
+                <span>•</span>
+                <span>{peData.segments?.length || 0} segments</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
+              <p className="text-xs text-indigo-600">
+                PushEngage not detected on this page. Visit a page with PE SDK or ask general questions about PushEngage.
+              </p>
+            </div>
+          )
         ) : (
-          // Generic mode - no specific context but still usable
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-800 flex items-center gap-1">
-                💬 General Assistant
-              </span>
-              <button
-                onClick={onModeSwitch}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-              >
-                <ArrowLeftRight size={12} />
-                Switch Mode
-              </button>
-            </div>
-            <p className="text-xs text-blue-600 mt-1">
-              {mode === 'debug'
-                ? 'No error selected. Ask general questions or select an error from the Errors tab.'
-                : 'PushEngage not detected. Ask general questions or visit a page with PE SDK.'}
+            <p className="text-xs text-blue-700">
+              💡 General AI Assistant - Ask me anything about web development, JavaScript, debugging, or any other topic!
             </p>
           </div>
         )}
@@ -240,11 +260,13 @@ export default function ChatInterface({
           <div className="text-center py-8">
             <Bot size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-sm text-gray-500 mb-2">
-              {hasSpecificContext
-                ? mode === 'debug'
-                  ? 'Ask questions about the error or request debugging help'
-                  : 'Ask questions about your PushEngage configuration'
-                : 'Ask me anything about web development, debugging, or PushEngage!'}
+              {mode === 'debug' && selectedError
+                ? 'Ask questions about the error or request debugging help'
+                : mode === 'pushengage' && peData
+                  ? 'Ask questions about your PushEngage configuration'
+                  : mode === 'general'
+                    ? 'Ask me anything - coding, debugging, web development, or general questions!'
+                    : 'Ask me anything about web development, debugging, or PushEngage!'}
             </p>
             {/* Show example queries */}
             <div className="mt-4 space-y-2">
@@ -261,12 +283,27 @@ export default function ChatInterface({
                   <ExampleChip text="Cart abandonment settings" onClick={() => setInput("What are my cart abandonment settings?")} />
                   <ExampleChip text="Opt-in configuration" onClick={() => setInput("Explain my opt-in configuration")} />
                 </div>
-              ) : (
-                // Generic examples when no specific context
+              ) : mode === 'general' ? (
+                // General mode examples
                 <div className="flex flex-wrap gap-2 justify-center">
-                  <ExampleChip text="How does async/await work?" onClick={() => setInput("How does async/await work in JavaScript?")} />
-                  <ExampleChip text="Explain push notifications" onClick={() => setInput("How do web push notifications work?")} />
+                  <ExampleChip text="Explain async/await" onClick={() => setInput("How does async/await work in JavaScript?")} />
+                  <ExampleChip text="Best practices for React" onClick={() => setInput("What are the best practices for React development?")} />
+                  <ExampleChip text="CSS Grid vs Flexbox" onClick={() => setInput("When should I use CSS Grid vs Flexbox?")} />
                   <ExampleChip text="Debug CORS errors" onClick={() => setInput("How do I debug CORS errors?")} />
+                </div>
+              ) : mode === 'debug' ? (
+                // Debug mode without selected error
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <ExampleChip text="Common JavaScript errors" onClick={() => setInput("What are the most common JavaScript errors and how to fix them?")} />
+                  <ExampleChip text="Debug null errors" onClick={() => setInput("How do I debug 'Cannot read property of null' errors?")} />
+                  <ExampleChip text="Console debugging tips" onClick={() => setInput("What are some advanced console debugging tips?")} />
+                </div>
+              ) : (
+                // PushEngage mode without PE data
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <ExampleChip text="What is PushEngage?" onClick={() => setInput("What is PushEngage and how does it work?")} />
+                  <ExampleChip text="Setup push notifications" onClick={() => setInput("How do I set up web push notifications?")} />
+                  <ExampleChip text="Cart abandonment campaigns" onClick={() => setInput("How do cart abandonment campaigns work?")} />
                 </div>
               )}
             </div>
@@ -372,11 +409,15 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              hasSpecificContext
-                ? mode === 'debug'
+              mode === 'debug'
+                ? selectedError
                   ? 'Ask about this error...'
-                  : 'Ask about PushEngage config...'
-                : 'Ask me anything...'
+                  : 'Ask debugging questions...'
+                : mode === 'pushengage'
+                  ? peData
+                    ? 'Ask about PushEngage config...'
+                    : 'Ask about PushEngage...'
+                  : 'Ask me anything...'
             }
             className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-gray-50"
             disabled={isLoading}

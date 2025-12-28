@@ -25,6 +25,9 @@ export interface ApiConfig {
   model: string;
 }
 
+// Chat Mode Type
+export type ChatMode = 'debug' | 'pushengage' | 'general';
+
 // App State
 export interface AppState {
   errors: ConsoleError[];
@@ -33,8 +36,10 @@ export interface AppState {
   peAvailable: boolean;
   apiConfig: ApiConfig | null;
   activeTab: 'errors' | 'pushengage' | 'chat' | 'settings';
-  chatMode: 'debug' | 'pushengage';
-  messages: ChatMessage[];
+  chatMode: ChatMode;
+  debugMessages: ChatMessage[];
+  pushengageMessages: ChatMessage[];
+  generalMessages: ChatMessage[];
   isLoading: boolean;
 }
 

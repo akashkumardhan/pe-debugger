@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ChatMessage, ApiConfig, ConsoleError, PEAppConfig } from '../../types';
+import type { ChatMessage, ApiConfig, ConsoleError, PEAppConfig, ChatMode } from '../../types';
 import { createAdapter, type AIAdapter, type AdapterMessage } from '../../services/adapters';
 import { clientTools, registerUIUpdateCallback, unregisterUIUpdateCallback } from '../../tools/client';
 import { allToolDefinitions } from '../../tools/definitions';
@@ -18,7 +18,7 @@ import { pushEngageService } from '../../services/pushEngage';
 
 interface UseAIChatOptions {
   apiConfig: ApiConfig | null;
-  mode: 'debug' | 'pushengage';
+  mode: ChatMode;
   selectedError: ConsoleError | null;
   peData: PEAppConfig | null;
   onUIUpdate?: (message: string, type: string, duration: number) => void;
@@ -38,7 +38,7 @@ interface UseAIChatReturn {
  * Build system prompt based on chat mode and available context
  */
 function buildSystemPrompt(
-  mode: 'debug' | 'pushengage',
+  mode: ChatMode,
   selectedError: ConsoleError | null,
   peData: PEAppConfig | null
 ): string {
@@ -53,8 +53,10 @@ You have access to the following tools:
 When appropriate, use these tools to help answer questions.
 `;
 
-  if (mode === 'debug' && selectedError) {
-    return `You are an expert JavaScript debugger and developer assistant. Your role is to analyze console errors and provide clear, actionable solutions.
+  // Debug mode - with or without selected error
+  if (mode === 'debug') {
+    if (selectedError) {
+      return `You are an expert JavaScript debugger and developer assistant. Your role is to analyze console errors and provide clear, actionable solutions.
 
 ${toolsDescription}
 
@@ -80,12 +82,30 @@ ${selectedError.stack}
 4. **Prevention Tips** - Suggest how to avoid this error in the future
 
 Use markdown formatting for code blocks and be concise but thorough.`;
+    } else {
+      return `You are an expert JavaScript debugger and developer assistant. You help developers understand and fix console errors, debugging issues, and common JavaScript/TypeScript problems.
+
+${toolsDescription}
+
+## YOUR CAPABILITIES:
+
+1. **Error Analysis** - Explain what common errors mean and how to fix them
+2. **Debugging Guidance** - Provide debugging strategies and techniques
+3. **Code Review** - Help identify potential issues in code snippets
+4. **Best Practices** - Share debugging best practices and tips
+
+No specific error is currently selected. Help the user with general debugging questions or guide them to select an error from the Errors tab for detailed analysis.
+
+Use markdown formatting for code blocks and be concise but thorough.`;
+    }
   }
 
-  if (mode === 'pushengage' && peData) {
-    const peContext = pushEngageService.buildAIContext(peData);
-    
-    return `You are a helpful assistant specialized in PushEngage push notification platform configuration and management.
+  // PushEngage mode - with or without PE data
+  if (mode === 'pushengage') {
+    if (peData) {
+      const peContext = pushEngageService.buildAIContext(peData);
+      
+      return `You are a helpful assistant specialized in PushEngage push notification platform configuration and management.
 
 ${toolsDescription}
 
@@ -101,13 +121,47 @@ ${peContext}
 4. Be concise, accurate, and helpful
 5. Use markdown formatting for better readability
 6. When listing campaigns or settings, format them clearly`;
-  }
-
-  return `You are a helpful AI assistant for developers. 
+    } else {
+      return `You are a helpful assistant specialized in PushEngage push notification platform.
 
 ${toolsDescription}
 
-Provide clear, concise answers with code examples when appropriate. Use markdown formatting.`;
+## YOUR CAPABILITIES:
+
+1. **PushEngage Knowledge** - Answer questions about PushEngage features, setup, and configuration
+2. **Campaign Guidance** - Help with browse abandonment, cart abandonment, and other campaign types
+3. **Integration Help** - Assist with SDK integration and troubleshooting
+4. **Best Practices** - Share web push notification best practices
+
+PushEngage is not detected on the current page. You can still help with general PushEngage questions. For specific configuration analysis, visit a page with PushEngage SDK installed.
+
+Use markdown formatting and be helpful.`;
+    }
+  }
+
+  // General mode - acts like ChatGPT
+  return `You are a helpful AI assistant, similar to ChatGPT. You can assist with a wide variety of topics including:
+
+${toolsDescription}
+
+## YOUR CAPABILITIES:
+
+1. **Programming & Development** - Help with JavaScript, TypeScript, React, CSS, HTML, Node.js, and other web technologies
+2. **Code Explanation** - Explain code snippets, algorithms, and programming concepts
+3. **Code Generation** - Write code snippets, functions, and examples
+4. **Debugging Help** - Provide guidance on debugging and troubleshooting
+5. **Best Practices** - Share development best practices and patterns
+6. **General Knowledge** - Answer questions on any topic
+
+## RESPONSE GUIDELINES:
+
+- Be helpful, accurate, and conversational
+- Use markdown formatting for code blocks
+- Provide clear explanations with examples when helpful
+- Be concise but thorough
+- If you're unsure about something, say so
+
+Feel free to ask me anything!`;
 }
 
 /**

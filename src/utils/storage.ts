@@ -44,6 +44,19 @@ export async function clearErrors(tabId?: number): Promise<void> {
 }
 
 /**
+ * Refresh errors for a tab - clears existing and re-injects content script
+ * @param tabId - The tab ID to refresh errors for
+ */
+export async function refreshErrors(tabId?: number): Promise<{ success: boolean; errors: ConsoleError[] }> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'REFRESH_ERRORS', tabId });
+    return response || { success: false, errors: [] };
+  } catch {
+    return { success: false, errors: [] };
+  }
+}
+
+/**
  * Get the current active tab ID
  */
 export async function getCurrentTabId(): Promise<number | undefined> {

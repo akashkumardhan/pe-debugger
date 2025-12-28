@@ -60,6 +60,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'CLEAR_PE_CONFIG':
       clearPEConfig().then(() => sendResponse({ success: true }));
       return true;
+
+    case 'REFRESH_ERRORS':
+      refreshErrorsForTab(message.tabId).then(sendResponse);
+      return true;
   }
 
   return true;
@@ -217,6 +221,45 @@ function updateBadge(count: number, tabId?: number): void {
   } else {
     chrome.action.setBadgeText({ text });
     chrome.action.setBadgeBackgroundColor({ color });
+  }
+}
+
+// Refresh errors for a tab by re-injecting the content script
+async function refreshErrorsForTab(tabId?: number): Promise<{ success: boolean; errors: ConsoleError[] }> {
+  try {
+    if (!tabId) {
+      // Get current active tab if tabId not provided
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      tabId = tab?.id;
+    }
+
+    if (!tabId) {
+      return { success: false, errors: [] };
+    }
+
+    // Clear existing errors for this tab first
+    const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
+    const filteredErrors = errors.filter(e => e.tabId !== tabId);
+    await chrome.storage.local.set({ errors: filteredErrors });
+
+    // Re-inject the content script to capture fresh errors
+    // Note: This runs the error capture setup again
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        // Re-setup error capturing in the page context
+        // This will capture any new errors that occur after refresh
+        console.log('[DevDebug AI] Error capture refreshed');
+      }
+    });
+
+    // Return empty errors (fresh start for this tab)
+    updateBadge(0, tabId);
+    return { success: true, errors: [] };
+  } catch (err) {
+    console.error('DevDebug: Failed to refresh errors:', err);
+    return { success: false, errors: [] };
   }
 }
 

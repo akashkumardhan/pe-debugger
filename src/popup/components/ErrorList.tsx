@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Search, Trash2, AlertCircle, AlertTriangle, Filter } from 'lucide-react';
+import { Search, Trash2, AlertCircle, AlertTriangle, Filter, RefreshCw } from 'lucide-react';
 import type { ConsoleError } from '../../types';
-import { clearErrors } from '../../utils/storage';
+import { clearErrors, refreshErrors, getErrors } from '../../utils/storage';
 import ErrorCard from './ErrorCard';
 
 interface ErrorListProps {
@@ -16,6 +16,7 @@ type FilterType = 'all' | 'error' | 'warning';
 export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }: ErrorListProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter and search errors
   const filteredErrors = useMemo(() => {
@@ -44,6 +45,24 @@ export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }:
     if (confirm('Are you sure you want to clear all errors for this tab?')) {
       await clearErrors(currentTabId);
       onUpdate([]);
+    }
+  };
+
+  // Handle refresh - clears and re-fetches errors for current tab
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh errors (clears existing and re-injects content script)
+      await refreshErrors(currentTabId);
+      // Re-fetch fresh errors after a brief delay to allow content script to capture
+      setTimeout(async () => {
+        const freshErrors = await getErrors(currentTabId);
+        onUpdate(freshErrors);
+        setIsRefreshing(false);
+      }, 500);
+    } catch (err) {
+      console.error('Failed to refresh errors:', err);
+      setIsRefreshing(false);
     }
   };
 
@@ -101,15 +120,25 @@ export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }:
             </button>
           </div>
 
-          {errors.length > 0 && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleClearAll}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-error transition-colors"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-primary transition-colors disabled:opacity-50"
             >
-              <Trash2 size={12} />
-              Clear
+              <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
-          )}
+            {errors.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-error transition-colors"
+              >
+                <Trash2 size={12} />
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

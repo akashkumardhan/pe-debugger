@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bug, Megaphone, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
-import type { ConsoleError, ApiConfig, ChatMessage, PEAppConfig } from '../types';
+import type { ConsoleError, ApiConfig, ChatMessage, PEAppConfig, ChatMode } from '../types';
 import { getApiConfig, getErrors, getPEStatus, getCurrentTabId } from '../utils/storage';
 import ErrorList from './components/ErrorList';
 import ChatInterface from './components/ChatInterface';
@@ -9,7 +9,6 @@ import Settings from './components/Settings';
 import ApiKeySetup from './components/ApiKeySetup';
 
 type Tab = 'errors' | 'pushengage' | 'chat' | 'settings';
-type ChatMode = 'debug' | 'pushengage';
 
 export default function App() {
   // State
@@ -19,8 +18,11 @@ export default function App() {
   const [peAvailable, setPeAvailable] = useState(false);
   const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('errors');
-  const [chatMode, setChatMode] = useState<ChatMode>('debug');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatMode, setChatMode] = useState<ChatMode>('general');
+  // Separate message histories for each mode
+  const [debugMessages, setDebugMessages] = useState<ChatMessage[]>([]);
+  const [pushengageMessages, setPushengageMessages] = useState<ChatMessage[]>([]);
+  const [generalMessages, setGeneralMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
   const [currentTabId, setCurrentTabId] = useState<number | undefined>(undefined);
@@ -104,24 +106,42 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentTabId]);
 
-  // Handle error analysis
+  // Get current messages based on mode
+  const getCurrentMessages = useCallback((): ChatMessage[] => {
+    switch (chatMode) {
+      case 'debug': return debugMessages;
+      case 'pushengage': return pushengageMessages;
+      case 'general': return generalMessages;
+    }
+  }, [chatMode, debugMessages, pushengageMessages, generalMessages]);
+
+  // Set messages for current mode
+  const setCurrentMessages = useCallback((messages: ChatMessage[]) => {
+    switch (chatMode) {
+      case 'debug': setDebugMessages(messages); break;
+      case 'pushengage': setPushengageMessages(messages); break;
+      case 'general': setGeneralMessages(messages); break;
+    }
+  }, [chatMode]);
+
+  // Handle error analysis - switches to debug mode
   const handleAnalyzeError = useCallback((error: ConsoleError) => {
     setSelectedError(error);
     setChatMode('debug');
     setActiveTab('chat');
   }, []);
 
-  // Handle PE query selection
+  // Handle PE query selection - switches to pushengage mode
   const handlePEQuerySelect = useCallback((query: string) => {
     setChatMode('pushengage');
     setActiveTab('chat');
-    // Add the query as a user message
-    setMessages(prev => [...prev, { role: 'user', content: query }]);
+    // Add the query as a user message to pushengage messages
+    setPushengageMessages(prev => [...prev, { role: 'user', content: query }]);
   }, []);
 
-  // Handle mode switch
-  const handleModeSwitch = useCallback(() => {
-    setChatMode(prev => prev === 'debug' ? 'pushengage' : 'debug');
+  // Handle explicit mode change from radio buttons
+  const handleModeChange = useCallback((newMode: ChatMode) => {
+    setChatMode(newMode);
   }, []);
 
   // Handle config save
@@ -194,9 +214,9 @@ export default function App() {
             selectedError={selectedError}
             peData={peData}
             apiConfig={apiConfig}
-            messages={messages}
-            onMessagesChange={setMessages}
-            onModeSwitch={handleModeSwitch}
+            messages={getCurrentMessages()}
+            onMessagesChange={setCurrentMessages}
+            onModeChange={handleModeChange}
           />
         );
       case 'settings':
