@@ -242,15 +242,167 @@ async function refreshErrorsForTab(tabId?: number): Promise<{ success: boolean; 
     const filteredErrors = errors.filter(e => e.tabId !== tabId);
     await chrome.storage.local.set({ errors: filteredErrors });
 
-    // Re-inject the content script to capture fresh errors
-    // Note: This runs the error capture setup again
+    // Re-inject the FULL content script to setup error capturing
+    // This ensures error listeners are active and working
     await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
       func: () => {
         // Re-setup error capturing in the page context
-        // This will capture any new errors that occur after refresh
-        console.log('[DevDebug AI] Error capture refreshed');
+        interface CapturedError {
+          id: number;
+          type: 'error' | 'warning';
+          message: string;
+          stack: string;
+          filename: string;
+          lineno: number;
+          timestamp: number;
+          url: string;
+        }
+
+        const seenErrors = new Map<string, number>();
+
+        // Override console.error if not already done
+        const originalError = (window as any).__devdebug_original_error || console.error;
+        const originalWarn = (window as any).__devdebug_original_warn || console.warn;
+        
+        // Store originals to avoid multiple overrides
+        (window as any).__devdebug_original_error = originalError;
+        (window as any).__devdebug_original_warn = originalWarn;
+
+        function captureError(
+          type: 'error' | 'warning',
+          args: unknown[],
+          filename?: string,
+          lineno?: number,
+          stack?: string
+        ): void {
+          const message = args.map(arg => {
+            if (arg instanceof Error) return arg.message;
+            if (typeof arg === 'object') {
+              try {
+                return JSON.stringify(arg);
+              } catch {
+                return String(arg);
+              }
+            }
+            return String(arg);
+          }).join(' ');
+
+          if (!message.trim()) return;
+          if (message.includes('DevDebug') || message.includes('PE_')) return;
+          if (message.includes('PushEngage is not defined')) return;
+
+          const errorKey = `${type}-${message}`;
+          const now = Date.now();
+
+          if (seenErrors.has(errorKey)) {
+            const lastSeen = seenErrors.get(errorKey)!;
+            if (now - lastSeen < 5000) return;
+          }
+          seenErrors.set(errorKey, now);
+
+          const actualStack = stack || new Error().stack || '';
+          
+          function extractFileFromStack(s: string): string {
+            if (!s) return 'unknown';
+            const lines = s.split('\n');
+            for (const line of lines) {
+              const match = line.match(/(https?:\/\/[^\s:]+|file:\/\/[^\s:]+)/);
+              if (match) return match[1].replace(/:\d+:\d+$/, '');
+            }
+            return 'unknown';
+          }
+
+          function extractLineFromStack(s: string): number {
+            if (!s) return 0;
+            const match = s.match(/:(\d+):\d+/);
+            return match ? parseInt(match[1], 10) : 0;
+          }
+          
+          const error: CapturedError = {
+            id: Date.now() + Math.random(),
+            type,
+            message,
+            stack: actualStack,
+            filename: filename || extractFileFromStack(actualStack),
+            lineno: lineno || extractLineFromStack(actualStack),
+            timestamp: now,
+            url: window.location.href
+          };
+
+          window.postMessage({
+            source: 'devdebug-ai',
+            type: 'CONSOLE_ERROR',
+            error
+          }, '*');
+        }
+
+        // Override console methods
+        console.error = function(...args: unknown[]) {
+          captureError('error', args);
+          originalError.apply(console, args);
+        };
+
+        console.warn = function(...args: unknown[]) {
+          captureError('warning', args);
+          originalWarn.apply(console, args);
+        };
+
+        // Remove and re-add event listeners to ensure they're active
+        const errorHandler = (e: ErrorEvent) => {
+          captureError('error', [e.message], e.filename, e.lineno, (e.error as Error)?.stack);
+        };
+
+        const rejectionHandler = (e: PromiseRejectionEvent) => {
+          const reason = e.reason instanceof Error ? e.reason.message : String(e.reason);
+          const stack = e.reason instanceof Error ? e.reason.stack : '';
+          captureError('error', [`Unhandled Promise Rejection: ${reason}`], undefined, undefined, stack);
+        };
+
+        // Store handlers to avoid duplicates
+        if ((window as any).__devdebug_error_handler) {
+          window.removeEventListener('error', (window as any).__devdebug_error_handler);
+        }
+        if ((window as any).__devdebug_rejection_handler) {
+          window.removeEventListener('unhandledrejection', (window as any).__devdebug_rejection_handler);
+        }
+        
+        (window as any).__devdebug_error_handler = errorHandler;
+        (window as any).__devdebug_rejection_handler = rejectionHandler;
+        
+        window.addEventListener('error', errorHandler);
+        window.addEventListener('unhandledrejection', rejectionHandler);
+
+        console.log('%c🔧 DevDebug AI - Error capture refreshed', 'color: #3B82F6; font-weight: bold;');
+      }
+    });
+
+    // Also re-inject the bridge script in ISOLATED world
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        // Ensure bridge is listening
+        if (!(window as any).__devdebug_bridge_active) {
+          (window as any).__devdebug_bridge_active = true;
+          
+          window.addEventListener('message', (event) => {
+            if (event.source !== window) return;
+            
+            const data = event.data;
+            if (data?.source !== 'devdebug-ai') return;
+
+            try {
+              chrome.runtime.sendMessage({
+                type: data.type,
+                error: data.error,
+                hasPushEngage: data.hasPushEngage,
+                url: data.url,
+                config: data.config
+              }).catch(() => {});
+            } catch {}
+          });
+        }
       }
     });
 

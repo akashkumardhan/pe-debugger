@@ -59,6 +59,9 @@ export default function ChatInterface({
     }, duration);
   }, []);
 
+  // Track if we've auto-analyzed the current error
+  const lastAnalyzedErrorRef = useRef<string | null>(null);
+
   // Initialize AI Chat hook with current context
   const {
     messages: chatMessages,
@@ -87,6 +90,37 @@ export default function ChatInterface({
       setMessages(messages);
     }
   }, []);
+
+  // Auto-analyze when a new error is selected in debug mode
+  useEffect(() => {
+    // Only auto-analyze if:
+    // 1. We're in debug mode
+    // 2. There's a selected error
+    // 3. We haven't already analyzed this error
+    // 4. API is configured
+    // 5. Not currently loading
+    if (
+      mode === 'debug' &&
+      selectedError &&
+      apiConfig?.apiKey &&
+      !isLoading
+    ) {
+      const errorKey = `${selectedError.id}-${selectedError.message}`;
+      
+      // Check if this is a new error we haven't analyzed
+      if (lastAnalyzedErrorRef.current !== errorKey) {
+        lastAnalyzedErrorRef.current = errorKey;
+        
+        // Auto-send analysis request
+        const analysisPrompt = `Please analyze this error and help me fix it:\n\n**Error:** ${selectedError.message}\n\n**File:** ${selectedError.filename}:${selectedError.lineno}\n\n**Stack Trace:**\n\`\`\`\n${selectedError.stack}\n\`\`\``;
+        
+        // Small delay to ensure UI is ready
+        setTimeout(() => {
+          sendMessage(analysisPrompt);
+        }, 100);
+      }
+    }
+  }, [mode, selectedError, apiConfig, isLoading, sendMessage]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
