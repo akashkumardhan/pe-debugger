@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6"/>
+      <stop offset="100%" style="stop-color:#4642E5"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <g transform="translate(24, 24)">
+    <!-- Bug icon -->
+    <path d="M40 20C40 31.046 31.046 40 20 40C8.954 40 0 31.046 0 20C0 8.954 8.954 0 20 0C31.046 0 40 8.954 40 20Z" fill="white" fill-opacity="0.2"/>
+    <circle cx="40" cy="40" r="24" stroke="white" stroke-width="4" fill="none"/>
+    <path d="M30 35L40 45L50 35" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40 45V60" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="32" cy="36" r="4" fill="white"/>
+    <circle cx="48" cy="36" r="4" fill="white"/>
+    <!-- Antenna -->
+    <path d="M32 20L28 10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <path d="M48 20L52 10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <!-- Legs -->
+    <path d="M16 40L8 36" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <path d="M16 48L8 52" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <path d="M64 40L72 36" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <path d="M64 48L72 52" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <!-- Sparkle -->
+    <path d="M68 12L70 8L72 12L76 14L72 16L70 20L68 16L64 14Z" fill="white"/>
+  </g>
+</svg>
+

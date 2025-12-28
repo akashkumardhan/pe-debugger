@@ -1,0 +1,1443 @@
+---
+alwaysApply: true
+---
+
+## 📋 Core Requirements
+
+### 1. **Error Capture System**
+- Automatically detect and capture all console errors from active webpages
+- Capture details:
+  - Error message
+  - Stack trace
+  - File name and line number
+  - Timestamp
+  - Page URL
+- Store last 50 errors in Chrome storage
+- Real-time error detection without page refresh
+- Deduplicate identical errors
+
+### 2. **PushEngage Detection & Integration**
+- Detect if PushEngage SDK is loaded on current webpage
+- Fetch configuration using `PushEngage.getAppConfig()` API
+- Parse and structure PushEngage data:
+  - Browse abandonment campaigns
+  - Cart abandonment campaigns
+  - Price drop alerts
+  - Back in stock alerts
+  - Custom trigger campaigns
+  - Site configuration and settings
+  - Opt-in settings
+  - Subscription management widget
+  - Segments and subscriber attributes
+- Cache configuration data in Chrome storage
+- Periodic detection (every 5 seconds)
+
+### 3. **TanStack AI Client Integration**
+- Use `@tanstack/ai-client` for AI chat management
+- Support multiple LLM providers:
+  - OpenAI (GPT-4, GPT-3.5-turbo, GPT-4-turbo)
+  - Google Gemini (gemini-pro)
+  - Anthropic Claude (claude-3-sonnet, claude-3-opus, claude-3-haiku)
+- Streaming responses for real-time AI output
+- Context-aware suggestions for both error debugging and PushEngage queries
+- Dual-mode operation: Debug Mode and PushEngage Mode
+
+### 4. **Chat Interface**
+- Built-in chat UI in extension popup
+- Features:
+  - Mode switcher: Debug Mode / PushEngage Mode
+  - Message history (session-based)
+  - Quick action buttons for common queries
+  - Input field for custom questions
+  - Markdown rendering for code snippets
+  - Copy code/response button
+  - Loading states and error handling
+- Chat context includes:
+  - **Debug Mode**: Error details, stack trace, page context
+  - **PushEngage Mode**: Configuration data, campaign info, settings
+
+### 5. **Settings & Configuration**
+- API key management (secure storage)
+- Provider selection dropdown
+- Model selection per provider
+- Clear chat history option
+- Export errors as JSON
+- Export PushEngage config as JSON
+- Privacy toggle (enable/disable capture)
+- Refresh PushEngage data button
+
+---
+
+## 🏗️ Technical Architecture
+
+### Project Structure:
+```
+devdebug-ai/
+├── manifest.json
+├── src/
+│   ├── content/
+│   │   └── content.ts              # Error capture + PE detection
+│   ├── background/
+│   │   └── background.ts           # Service worker
+│   ├── popup/
+│   │   ├── App.tsx                 # Main popup component
+│   │   ├── components/
+│   │   │   ├── ErrorList.tsx       # Error display
+│   │   │   ├── ErrorCard.tsx       # Individual error card
+│   │   │   ├── ChatInterface.tsx   # Dual-mode chat UI
+│   │   │   ├── PushEngagePanel.tsx # PE dashboard
+│   │   │   ├── PEQuerySuggestions.tsx # Quick PE queries
+│   │   │   ├── PEConfigViewer.tsx  # JSON config viewer
+│   │   │   ├── Settings.tsx        # Settings page
+│   │   │   └── ApiKeySetup.tsx     # Initial setup
+│   │   ├── hooks/
+│   │   │   ├── useErrors.ts        # Error management
+│   │   │   ├── useApiKey.ts        # API key management
+│   │   │   ├── usePushEngageData.ts # PE data management
+│   │   │   └── useAIChat.ts        # AI chat hook
+│   │   └── popup.html
+│   ├── services/
+│   │   ├── pushEngage.ts           # PE service layer
+│   │   └── aiProvider.ts           # AI provider configs
+│   ├── types/
+│   │   ├── index.ts                # Common types
+│   │   └── pushEngage.ts           # PE type definitions
+│   └── utils/
+│       ├── storage.ts              # Chrome storage utils
+│       ├── llm-providers.ts        # LLM configurations
+│       ├── dataParser.ts           # PE data parser
+│       └── contextBuilder.ts       # AI context builder
+├── public/
+│   └── icons/
+├── package.json
+├── tsconfig.json
+├── tailwind.config.js
+└── vite.config.ts
+```
+
+---
+
+## 📦 Dependencies
+
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@tanstack/ai-client": "latest",
+    "lucide-react": "^0.263.1",
+    "react-markdown": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.258",
+    "@types/react": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "@crxjs/vite-plugin": "^2.0.0"
+  }
+}
+```
+
+---
+
+## 🎨 Component Specifications
+
+### **1. App.tsx (Main Component)**
+```typescript
+// Responsibilities:
+- Check if API key is configured
+- Show setup screen if no API key
+- Display error list + PushEngage panel + chat interface
+- Manage global state (errors, PE data, API key, chat mode)
+- Handle tab switching (Errors / PushEngage / Chat / Settings)
+- Detect if current page has PushEngage SDK loaded
+- Load errors and PE data from chrome.storage on mount
+```
+
+### **2. ErrorList.tsx**
+```typescript
+// Props: { errors: ConsoleError[], onAnalyze: (error) => void }
+// Features:
+- List all captured errors with cards
+- Filter: All / Errors / Warnings
+- Search by error message
+- Click error to select for analysis
+- "Analyze with AI" button per error
+- Clear all errors button
+- Show error count badge
+- Empty state when no errors
+```
+
+### **3. ErrorCard.tsx**
+```typescript
+// Props: { error: ConsoleError, onAnalyze: () => void }
+// Display:
+- Error type badge (error/warning)
+- Error message (truncated with "show more")
+- File name and line number
+- Timestamp (relative: "2 mins ago")
+- "Analyze" button
+- Expand/collapse stack trace
+- Copy error details button
+```
+
+### **4. ChatInterface.tsx**
+```typescript
+// Uses: AIClient from @tanstack/ai-client
+// Props: { mode: 'debug' | 'pushengage', selectedError?, peData?, apiKey, provider, model }
+// Features:
+- Mode indicator at top (Debug / PushEngage)
+- Message bubbles (user vs AI)
+- Auto-scroll to latest message
+- Input field with "Send" button
+- Show loading indicator during streaming
+- Display context at top:
+  * Debug Mode: Error details
+  * PushEngage Mode: Site info
+- "Clear chat" button
+- Copy message button
+- Markdown rendering for code blocks
+- Switch mode button
+```
+
+### **5. PushEngagePanel.tsx**
+```typescript
+// Props: { peData, peAvailable, onRefresh, onQuerySelect }
+// Features:
+- PushEngage detection status badge
+- Show "Not detected" message if !peAvailable
+- If peData exists, display:
+  * Campaign summary cards (total, active, browse, cart, custom)
+  * Site info card (name, URL, ID, subdomain)
+  * Quick stats (segments count, attributes count)
+  * Settings summary (chicklet, opt-in, analytics)
+- Include PEQuerySuggestions component
+- Include PEConfigViewer component (collapsible)
+- Refresh button to re-fetch PE data
+- "Ask AI" button to switch to chat mode
+```
+
+### **6. PEQuerySuggestions.tsx**
+```typescript
+// Props: { onQuerySelect: (query: string) => void }
+// Features:
+- Display grid of suggestion chips
+- Predefined queries:
+  * "Show me all active campaigns"
+  * "What are my cart abandonment settings?"
+  * "List all browse abandonment campaigns"
+  * "Show opt-in configuration"
+  * "What segments do I have?"
+  * "Explain my chicklet settings"
+  * "Is geo location enabled?"
+  * "What's my site URL and ID?"
+- Click handler triggers callback with query text
+- Switches to chat mode and sends query
+- Responsive grid (2 cols mobile, 3 cols desktop)
+- Hover effects and animations
+```
+
+### **7. PEConfigViewer.tsx**
+```typescript
+// Props: { peData: PEAppConfig }
+// Features:
+- Collapsible sections using <details> elements:
+  * Campaigns (browse, cart, custom triggers)
+  * Site Information
+  * Settings (chicklet, opt-in, privacy)
+  * Segments & Attributes
+- JSON syntax highlighting
+- Search/filter input (filters keys/values)
+- Copy full JSON button
+- Export as JSON file button
+- Expand/collapse all button
+- Line numbers for JSON
+```
+
+### **8. Settings.tsx**
+```typescript
+// Features:
+- API key input field (password type with show/hide toggle)
+- Provider selector: OpenAI / Gemini / Anthropic
+- Model selector (dynamic based on provider)
+- Test connection button (validates API key)
+- Save/Cancel buttons
+- Privacy section:
+  * Enable/disable error capture toggle
+  * Enable/disable PE detection toggle
+- Data management:
+  * Clear all errors button
+  * Clear PE cache button
+  * Export errors as JSON
+  * Export PE config as JSON
+- About section (version, links)
+```
+
+### **9. ApiKeySetup.tsx**
+```typescript
+// First-time setup wizard
+// Features:
+- Welcome message and feature overview
+- Step-by-step setup:
+  1. Choose provider (OpenAI, Gemini, Anthropic)
+  2. Enter API key
+  3. Select model
+  4. Test connection
+- Links to get API keys for each provider
+- "Get Started" button (saves and closes)
+- Skip button (use later)
+```
+
+---
+
+## 🔧 Implementation Details
+
+### **PushEngage Type Definitions**
+
+```typescript
+// types/pushEngage.ts
+
+export interface PECampaign {
+  status: string;
+  campaign_name: string;
+  start_event: string;
+  stop_event: string;
+}
+
+export interface PESiteInfo {
+  is_whitelabel: boolean;
+  site_id: number;
+  site_image: string;
+  site_key: string;
+  site_name: string;
+  site_subdomain: string;
+  site_url: string;
+  shopify_domain: string | null;
+  is_eu: boolean;
+}
+
+export interface PEChickletSettings {
+  settings: {
+    delay: number;
+  };
+  bell: {
+    bg: string;
+    color: string;
+    position: string;
+    label: string;
+  };
+}
+
+export interface PEOptinSettings {
+  intermediate: {
+    bg: string;
+    page_heading: string;
+    page_tagline: string;
+    allow_btn_txt: string;
+    allow_btn_bg: string;
+  };
+  activeOptin: {
+    http: { types: any[] };
+    https: { types: number[] };
+  };
+  optins: Record<string, any>;
+}
+
+export interface PEAppConfig {
+  browseAbandonments: PECampaign[];
+  cartAbandonments: PECampaign[];
+  priceDropAlerts: any[];
+  backInStockAlerts: any[];
+  customTriggerCampaigns: PECampaign[];
+  site: PESiteInfo;
+  siteSettings: {
+    chicklet_settings: PEChickletSettings;
+    gcm_options: { project_id: string };
+    optin_settings: PEOptinSettings;
+    privacy_settings: { geoLocationEnabled: boolean };
+    service_worker: any;
+    sub_analytics: { enabled: boolean };
+    subscription_management_widget: any;
+    vapid_key: { public_key: string };
+    reset_notification_permission_popup: any;
+    shopify_options: any;
+    shopify_wa_cart_abandonment: any;
+  };
+  segments: any[];
+  chatWidgets: any[];
+  subscriberAttributes: any[];
+}
+```
+
+### **manifest.json**
+```json
+{
+  "manifest_version": 3,
+  "name": "DevDebug AI",
+  "version": "1.0.0",
+  "description": "AI-powered console debugger with PushEngage integration",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/background.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.ts"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "public/icons/icon16.png",
+      "48": "public/icons/icon48.png",
+      "128": "public/icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "public/icons/icon16.png",
+    "48": "public/icons/icon48.png",
+    "128": "public/icons/icon128.png"
+  }
+}
+```
+
+### **content.ts (Error Capture + PushEngage Detection)**
+```typescript
+// Inject error capture and PE detection code
+(function() {
+  // ===== ERROR CAPTURE =====
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  const seenErrors = new Map<string, number>();
+
+  console.error = function(...args) {
+    captureError('error', args);
+    originalError.apply(console, args);
+  };
+
+  console.warn = function(...args) {
+    captureError('warning', args);
+    originalWarn.apply(console, args);
+  };
+
+  window.addEventListener('error', (e) => {
+    captureError('error', [e.message], e.filename, e.lineno, e.error?.stack);
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    captureError('error', [e.reason]);
+  });
+
+  function captureError(type: string, args: any[], filename?: string, lineno?: number, stack?: string) {
+    const message = args.map(String).join(' ');
+    const errorKey = `${type}-${message}`;
+    
+    // Deduplicate within 5 seconds
+    const now = Date.now();
+    if (seenErrors.has(errorKey)) {
+      const lastSeen = seenErrors.get(errorKey)!;
+      if (now - lastSeen < 5000) return;
+    }
+    seenErrors.set(errorKey, now);
+
+    const error = {
+      id: Date.now() + Math.random(),
+      type,
+      message,
+      stack: stack || new Error().stack || '',
+      filename: filename || extractFileFromStack(stack),
+      lineno: lineno || extractLineFromStack(stack),
+      timestamp: Date.now(),
+      url: window.location.href
+    };
+
+    chrome.runtime.sendMessage({ type: 'CONSOLE_ERROR', error });
+  }
+
+  function extractFileFromStack(stack?: string): string {
+    if (!stack) return 'unknown';
+    const match = stack.match(/(?:https?:\/\/[^\s]+|file:\/\/[^\s]+)/);
+    return match ? match[0] : 'unknown';
+  }
+
+  function extractLineFromStack(stack?: string): number {
+    if (!stack) return 0;
+    const match = stack.match(/:(\d+):\d+/);
+    return match ? parseInt(match[1]) : 0;
+  }
+
+  // ===== PUSHENGAGE DETECTION =====
+  function detectPushEngage() {
+    const hasPushEngage = typeof (window as any).PushEngage !== 'undefined';
+    
+    chrome.runtime.sendMessage({ 
+      type: 'PE_DETECTION', 
+      hasPushEngage,
+      url: window.location.href 
+    });
+    
+    if (hasPushEngage) {
+      try {
+        const peConfig = (window as any).PushEngage.getAppConfig();
+        
+        // Check if it's a promise or direct value
+        if (peConfig && typeof peConfig.then === 'function') {
+          peConfig.then((config: any) => {
+            chrome.runtime.sendMessage({ 
+              type: 'PE_CONFIG', 
+              config 
+            });
+          }).catch((err: any) => {
+            console.error('Failed to fetch PE config:', err);
+          });
+        } else if (peConfig) {
+          chrome.runtime.sendMessage({ 
+            type: 'PE_CONFIG', 
+            config: peConfig 
+          });
+        }
+      } catch (err) {
+        console.error('Error accessing PushEngage:', err);
+      }
+    }
+  }
+
+  // Initial detection
+  detectPushEngage();
+  
+  // Periodic detection (every 5 seconds)
+  setInterval(detectPushEngage, 5000);
+})();
+```
+
+### **PushEngage Service**
+
+```typescript
+// services/pushEngage.ts
+
+import { PEAppConfig, PECampaign } from '../types/pushEngage';
+
+export class PushEngageService {
+  /**
+   * Build AI context from PushEngage configuration
+   */
+  buildAIContext(config: PEAppConfig): string {
+    return `
+PushEngage Configuration Summary:
+
+CAMPAIGNS:
+- Browse Abandonments: ${config.browseAbandonments.length} campaigns
+${config.browseAbandonments.map(c => `  • ${c.campaign_name} (${c.status}): ${c.start_event} → ${c.stop_event}`).join('\n')}
+
+- Cart Abandonments: ${config.cartAbandonments.length} campaigns
+${config.cartAbandonments.map(c => `  • ${c.campaign_name} (${c.status}): ${c.start_event} → ${c.stop_event}`).join('\n')}
+
+- Custom Trigger Campaigns: ${config.customTriggerCampaigns.length} campaigns
+${config.customTriggerCampaigns.map(c => `  • ${c.campaign_name} (${c.status}): ${c.start_event} → ${c.stop_event}`).join('\n')}
+
+- Price Drop Alerts: ${config.priceDropAlerts.length} configured
+- Back In Stock Alerts: ${config.backInStockAlerts.length} configured
+
+SITE INFO:
+- Name: ${config.site.site_name}
+- ID: ${config.site.site_id}
+- URL: ${config.site.site_url}
+- Subdomain: ${config.site.site_subdomain}
+- EU Site: ${config.site.is_eu}
+- Whitelabel: ${config.site.is_whitelabel}
+
+SETTINGS:
+- Chicklet Position: ${config.siteSettings.chicklet_settings.bell.position}
+- Chicklet Label: ${config.siteSettings.chicklet_settings.bell.label}
+- Chicklet Colors: BG ${config.siteSettings.chicklet_settings.bell.bg}, Icon ${config.siteSettings.chicklet_settings.bell.color}
+- Geo Location Enabled: ${config.siteSettings.privacy_settings.geoLocationEnabled}
+- Subscription Analytics: ${config.siteSettings.sub_analytics.enabled}
+
+OPT-IN CONFIGURATION:
+- Page Heading: ${config.siteSettings.optin_settings.intermediate.page_heading}
+- Page Tagline: ${config.siteSettings.optin_settings.intermediate.page_tagline}
+- Allow Button Text: ${config.siteSettings.optin_settings.intermediate.allow_btn_txt}
+
+SEGMENTS: ${config.segments.length} configured
+SUBSCRIBER ATTRIBUTES: ${config.subscriberAttributes.length} configured
+CHAT WIDGETS: ${config.chatWidgets.length} configured
+    `.trim();
+  }
+
+  /**
+   * Parse campaign summary statistics
+   */
+  parseCampaignSummary(config: PEAppConfig) {
+    const allCampaigns = [
+      ...config.browseAbandonments,
+      ...config.cartAbandonments,
+      ...config.customTriggerCampaigns
+    ];
+
+    return {
+      totalCampaigns: allCampaigns.length,
+      activeCampaigns: allCampaigns.filter(c => c.status === 'active').length,
+      inactiveCampaigns: allCampaigns.filter(c => c.status !== 'active').length,
+      browseAbandonments: config.browseAbandonments.length,
+      cartAbandonments: config.cartAbandonments.length,
+      customTriggers: config.customTriggerCampaigns.length,
+      priceDropAlerts: config.priceDropAlerts.length,
+      backInStockAlerts: config.backInStockAlerts.length
+    };
+  }
+
+  /**
+   * Extract key settings for display
+   */
+  extractKeySettings(config: PEAppConfig) {
+    return {
+      siteName: config.site.site_name,
+      siteUrl: config.site.site_url,
+      siteId: config.site.site_id,
+      chickletPosition: config.siteSettings.chicklet_settings.bell.position,
+      chickletLabel: config.siteSettings.chicklet_settings.bell.label,
+      geoLocation: config.siteSettings.privacy_settings.geoLocationEnabled,
+      analytics: config.siteSettings.sub_analytics.enabled,
+      segmentsCount: config.segments.length,
+      attributesCount: config.subscriberAttributes.length
+    };
+  }
+}
+```
+
+### **ChatInterface.tsx (TanStack AI Client Integration)**
+```typescript
+import { AIClient } from '@tanstack/ai-client';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { PushEngageService } from '../../services/pushEngage';
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface ChatInterfaceProps {
+  mode: 'debug' | 'pushengage';
+  selectedError?: ConsoleError;
+  peData?: PEAppConfig;
+  apiKey: string;
+  provider: string;
+  model: string;
+  onModeSwitch: () => void;
+}
+
+function ChatInterface({ 
+  mode,
+  selectedError, 
+  peData, 
+  apiKey, 
+  provider, 
+  model,
+  onModeSwitch
+}: ChatInterfaceProps) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = useCallback(async (userMessage: string) => {
+    if (!apiKey || !userMessage.trim()) return;
+
+    setIsLoading(true);
+    const newUserMessage: Message = { role: 'user', content: userMessage };
+    setMessages(prev => [...prev, newUserMessage]);
+
+    try {
+      const client = new AIClient({
+        provider: provider as 'openai' | 'anthropic' | 'google',
+        apiKey,
+        model,
+      });
+
+      // Build system prompt based on mode
+      let systemPrompt = '';
+      
+      if (mode === 'debug' && selectedError) {
+        systemPrompt = `You are an expert JavaScript debugger. Analyze errors and provide clear, actionable solutions with code examples.
+
+Current Error:
+- Message: ${selectedError.message}
+- Stack: ${selectedError.stack}
+- File: ${selectedError.filename}:${selectedError.lineno}
+- URL: ${selectedError.url}
+- Timestamp: ${new Date(selectedError.timestamp).toLocaleString()}
+
+Provide: 1) Root cause analysis 2) Step-by-step solution 3) Code example to fix the issue`;
+      } else if (mode === 'pushengage' && peData) {
+        const peService = new PushEngageService();
+        const context = peService.buildAIContext(peData);
+        systemPrompt = `You are a helpful assistant specialized in PushEngage push notification platform.
+
+${context}
+
+Answer user questions based on this configuration data. Be concise, accurate, and helpful. If asked about something not in the data, clearly state that.`;
+      } else {
+        systemPrompt = 'You are a helpful AI assistant for developers.';
+      }
+
+      const systemMessage: Message = { role: 'system', content: systemPrompt };
+
+      // Send to AI with streaming
+      let assistantResponse = '';
+      
+      await client.chat.stream({
+        messages: [systemMessage, ...messages, newUserMessage],
+        onChunk: (chunk) => {
+          assistantResponse += chunk.content;
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
+            
+            if (lastMessage?.role === 'assistant') {
+              newMessages[newMessages.length - 1] = {
+                role: 'assistant',
+                content: assistantResponse
+              };
+            } else {
+              newMessages.push({
+                role: 'assistant',
+                content: assistantResponse
+              });
+            }
+            
+            return newMessages;
+          });
+        }
+      });
+
+    } catch (err: any) {
+      console.error('AI Chat Error:', err);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${err.message || 'Unknown error'}. Please check your API key and try again.`
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiKey, provider, model, selectedError, peData, mode, messages]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    sendMessage(input);
+    setInput('');
+  };
+
+  const clearChat = () => {
+    setMessages([]);
+  };
+
+  const copyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    // Show toast notification (implement separately)
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Context Header */}
+      <div className="mb-4">
+        {mode === 'debug' && selectedError && (
+          <div className="bg-red-50 p-3 rounded border border-red-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-red-800">Debug Mode</span>
+              <button 
+                onClick={onModeSwitch}
+                className="text-xs text-red-600 hover:text-red-800"
+              >
+                Switch to PushEngage
+              </button>
+            </div>
+            <p className="text-sm font-mono text-red-900">{selectedError.message}</p>
+            <p className="text-xs text-red-600 mt-1">
+              {selectedError.filename}:{selectedError.lineno}
+            </p>
+          </div>
+        )}
+        {mode === 'pushengage' && peData && (
+          <div className="bg-indigo-50 p-3 rounded border border-indigo-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-indigo-800">PushEngage Mode</span>
+              <button 
+                onClick={onModeSwitch}
+                className="text-xs text-indigo-600 hover:text-indigo-800"
+              >
+                Switch to Debug
+              </button>
+            </div>
+            <p className="text-sm font-semibold text-indigo-900">{peData.site.site_name}</p>
+            <p className="text-xs text-indigo-600">{peData.site.site_url}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+        {messages.length === 0 && (
+          <div className="text-center text-gray-500 text-sm mt-8">
+            {mode === 'debug' 
+              ? '💬 Ask questions about the error or request debugging help'
+              : '📊 Ask questions about your PushEngage configuration'}
+          </div>
+        )}
+        
+        {messages.map((m, i) => (
+          m.role !== 'system' && (
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] rounded-lg p-3 ${
+                m.role === 'user' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-100 text-gray-900'
+              }`}>
+                <ReactMarkdown className="text-sm prose prose-sm max-w-none">
+                  {m.role === 'assistant' && (
+                  <button
+                    onClick={() => copyMessage(m.content)}
+                    className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    📋 Copy
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        ))}
+        
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <div className="animate-pulse">●</div>
+                <div className="animate-pulse animation-delay-200">●</div>
+                <div className="animate-pulse animation-delay-400">●</div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t pt-4">
+        {messages.length > 0 && (
+          <button
+            onClick={clearChat}
+            className="text-xs text-gray-500 hover:text-gray-700 mb-2"
+          >
+            🗑️ Clear chat
+          </button>
+        )}
+        
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={
+              mode === 'debug' 
+                ? "Ask about this error..." 
+                : "Ask about PushEngage configuration..."
+            }
+            className="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default ChatInterface;
+```
+
+### **LLM Provider Configuration**
+```typescript
+// utils/llm-providers.ts
+
+export const LLM_PROVIDERS = {
+  openai: {
+    name: 'OpenAI',
+    models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'],
+    requiresApiKey: true,
+  },
+  anthropic: {
+    name: 'Anthropic Claude',
+    models: [
+      'claude-3-opus-20240229',
+      'claude-3-sonnet-20240229',
+      'claude-3-haiku-20240307'
+    ],
+    requiresApiKey: true,
+  },
+  google: {
+    name: 'Google Gemini',
+    models: ['gemini-pro', 'gemini-pro-vision'],
+    requiresApiKey: true,
+  }
+} as const;
+
+export type AIProvider = keyof typeof LLM_PROVIDERS;
+
+export function getProviderModels(provider: AIProvider): string[] {
+  return LLM_PROVIDERS[provider].models;
+}
+```
+
+---
+
+## 🎨 UI/UX Design
+
+### **Color Scheme**
+```css
+Primary: Blue (#3B82F6)
+Secondary: Indigo (#4642E5) /* PushEngage brand color */
+Success: Green (#10B981)
+Error: Red (#EF4444)
+Warning: Yellow (#F59E0B)
+Background: White (#FFFFFF)
+Surface: Gray-50 (#F9FAFB)
+Text: Gray-900 (#111827)
+Border: Gray-200 (#E5E7EB)
+```
+
+### **Layout (Popup Dimensions)**
+```
+Width: 400px (responsive)
+Height: 600px
+Padding: 16px
+Font: Inter, system-ui, sans-serif
+```
+
+### **Tabs**
+```
+[🐛 Errors] [📊 PushEngage] [💬 Chat] [⚙️ Settings]
+```
+
+---
+
+## ✅ Acceptance Criteria
+
+### **Phase 1: MVP (Week 1)**
+- [ ] Extension installs successfully
+- [ ] Captures console.error and console.warn
+- [ ] Displays errors in popup with timestamp
+- [ ] Settings page with API key input
+- [ ] "Analyze" button sends error to AI
+- [ ] Chat interface shows AI response in Debug Mode
+- [ ] Supports OpenAI GPT-4
+- [ ] Detects PushEngage SDK presence
+
+### **Phase 2: Enhanced (Week 2)**
+- [ ] Support for Gemini and Anthropic
+- [ ] Streaming responses with real-time display
+- [ ] Chat history persists during session
+- [ ] Copy code snippets button
+- [ ] Error filtering and search
+- [ ] Clear errors functionality
+- [ ] PushEngage config fetching
+- [ ] PushEngage Mode in chat
+- [ ] Query suggestions for PE
+
+### **Phase 3: Polish (Week 3)**
+- [ ] Error deduplication
+- [ ] Export errors as JSON
+- [ ] Export PE config as JSON
+- [ ] Markdown rendering for AI responses
+- [ ] Loading states and animations
+- [ ] Error handling for API failures
+- [ ] Rate limit handling
+- [ ] PE config viewer with JSON display
+- [ ] Campaign summary cards
+- [ ] Mode switching between Debug and PE
+
+---
+
+## 🚀 Cursor AI Instructions
+
+### **Step 1: Initialize Project**
+```bash
+# Create new project
+npm create vite@latest devdebug-ai -- --template react-ts
+cd devdebug-ai
+
+# Install dependencies
+npm install @tanstack/ai-client lucide-react react-markdown
+npm install -D @types/chrome @crxjs/vite-plugin tailwindcss postcss autoprefixer
+
+# Initialize Tailwind
+npx tailwindcss init -p
+```
+
+### **Step 2: Configure Vite for Chrome Extension**
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { crx } from '@crxjs/vite-plugin';
+import manifest from './manifest.json';
+
+export default defineConfig({
+  plugins: [react(), crx({ manifest })],
+  build: {
+    rollupOptions: {
+      input: {
+        popup: 'src/popup/popup.html',
+      }
+    }
+  }
+});
+```
+
+### **Step 3: Create Type Definitions**
+**Prompt for Cursor:**
+```
+Create src/types/index.ts with TypeScript interfaces for:
+1. ConsoleError interface (id, type, message, stack, filename, lineno, timestamp, url)
+2. ChatMessage interface (role, content, timestamp)
+3. ApiConfig interface (apiKey, provider, model)
+4. AppState interface
+
+Then create src/types/pushEngage.ts with complete PushEngage types:
+1. PECampaign interface
+2. PESiteInfo interface  
+3. PEChickletSettings interface
+4. PEOptinSettings interface
+5. PEAppConfig (main interface with all nested objects)
+Include all fields from the provided PE API response sample.
+```
+
+### **Step 4: Build Content Script**
+**Prompt for Cursor:**
+```
+Create src/content/content.ts that:
+1. Overrides console.error and console.warn
+2. Listens for window.error and unhandledrejection events
+3. Captures error details (message, stack, filename, lineno, timestamp, url)
+4. Implements deduplication (skip identical errors within 5 seconds)
+5. Sends errors to background via chrome.runtime.sendMessage
+6. Detects PushEngage SDK availability (window.PushEngage)
+7. Fetches PE config using PushEngage.getAppConfig()
+8. Sends PE detection and config to background
+9. Periodic PE detection (every 5 seconds)
+10. Include helper functions: extractFileFromStack, extractLineFromStack
+11. Use TypeScript with proper types
+```
+
+### **Step 5: Build Background Service Worker**
+**Prompt for Cursor:**
+```
+Create src/background/background.ts that:
+1. Listens for messages from content script
+2. Handles CONSOLE_ERROR messages:
+   - Store errors in chrome.storage.local
+   - Maintain max 50 errors (FIFO)
+   - Implement deduplication
+3. Handles PE_DETECTION messages:
+   - Store PE availability status
+   - Track which tabs have PE
+4. Handles PE_CONFIG messages:
+   - Store PE configuration data
+   - Cache for current tab
+5. Provide utility functions:
+   - getErrors(): Promise<ConsoleError[]>
+   - clearErrors(): Promise<void>
+   - getPEConfig(): Promise<PEAppConfig | null>
+   - clearPEConfig(): Promise<void>
+6. Use TypeScript with proper Chrome API types
+```
+
+### **Step 6: Create PushEngage Service**
+**Prompt for Cursor:**
+```
+Create src/services/pushEngage.ts:
+1. Export PushEngageService class
+2. Implement buildAIContext(config: PEAppConfig): string
+   - Format config as readable text for AI
+   - Include campaigns, site info, settings, segments
+3. Implement parseCampaignSummary(config: PEAppConfig)
+   - Return stats: total, active, by type
+4. Implement extractKeySettings(config: PEAppConfig)
+   - Return key settings for display
+5. Include error handling
+6. Use TypeScript with proper types
+```
+
+### **Step 7: Build Chat Interface**
+**Prompt for Cursor:**
+```
+Create src/popup/components/ChatInterface.tsx using @tanstack/ai-client:
+1. Import AIClient from '@tanstack/ai-client'
+2. Accept props: mode, selectedError, peData, apiKey, provider, model, onModeSwitch
+3. State: messages[], input, isLoading
+4. Implement sendMessage with AIClient:
+   - Build system prompt based on mode (debug vs pushengage)
+   - Use client.chat.stream() for streaming
+   - Handle chunks and update messages
+5. Show context header (error or PE site info)
+6. Render messages with user/assistant styling
+7. Implement handleSubmit, clearChat, copyMessage
+8. Use react-markdown for formatting
+9. Auto-scroll to bottom
+10. Style with Tailwind CSS
+```
+
+### **Step 8: Build PushEngage Panel**
+**Prompt for Cursor:**
+```
+Create src/popup/components/PushEngagePanel.tsx:
+1. Accept props: peData, peAvailable, onRefresh, onQuerySelect
+2. Show PE detection status badge
+3. Display "Not detected" if !peAvailable
+4. If peData exists, show:
+   - Campaign summary cards (use parseCampaignSummary)
+   - Site info card (name, URL, ID)
+   - Quick stats (segments, attributes)
+   - Settings summary (chicklet, analytics)
+5. Include PEQuerySuggestions component
+6. Include PEConfigViewer component (collapsible)
+7. Refresh button
+8. "Ask AI" button to switch to chat
+9. Style with Tailwind CSS
+```
+
+### **Step 9: Build Query Suggestions**
+**Prompt for Cursor:**
+```
+Create src/popup/components/PEQuerySuggestions.tsx:
+1. Accept onQuerySelect callback
+2. Display grid of query chips (predefined):
+   - "Show me all active campaigns"
+   - "What are my cart abandonment settings?"
+   - "List all browse abandonment campaigns"
+   - "Show opt-in configuration"
+   - "What segments do I have?"
+   - "Explain my chicklet settings"
+3. Click handler triggers callback
+4. Responsive grid (2 cols mobile, 3 desktop)
+5. Hover effects
+6. Style with Tailwind CSS
+```
+
+### **Step 10: Build Config Viewer**
+**Prompt for Cursor:**
+```
+Create src/popup/components/PEConfigViewer.tsx:
+1. Accept peData prop
+2. Collapsible sections using <details>:
+   - Campaigns
+   - Site Info
+   - Settings
+   - Segments
+3. JSON syntax highlighting (simple color coding)
+4. Search/filter input
+5. Copy JSON button
+6. Export as file button
+7. Expand/collapse all
+8. Style with Tailwind CSS
+```
+
+### **Step 11: Build Main App**
+**Prompt for Cursor:**
+```
+Create src/popup/App.tsx:
+1. Four tabs: Errors, PushEngage, Chat, Settings
+2. Check for API key on mount (show ApiKeySetup if missing)
+3. State management:
+   - errors[], selectedError
+   - peData, peAvailable
+   - apiKey, provider, model
+   - activeTab, chatMode
+4. Load errors and PE data from chrome.storage on mount
+5. Implement tab switching
+6. Pass props to child components
+7. Handle mode switching (debug/pushengage)
+8. Error boundary
+9. Style with Tailwind CSS
+```
+
+### **Step 12: Build Remaining Components**
+**Prompts:**
+```
+1. Create ErrorList.tsx: Display errors, filter, search, analyze button
+2. Create ErrorCard.tsx: Show error details, expandable stack trace
+3. Create Settings.tsx: 
+   - API key form, provider/model selectors
+   - Test connection button
+   - Privacy toggles
+   - Data management (clear errors, clear PE cache)
+   - Export buttons
+4. Create ApiKeySetup.tsx: First-time setup wizard
+5. Create hooks:
+   - useErrors.ts: Error management
+   - useApiKey.ts: API key management
+   - usePushEngageData.ts: PE data management
+   - useAIChat.ts: AI chat wrapper
+```
+
+### **Step 13: Storage Utilities**
+**Prompt for Cursor:**
+```
+Create src/utils/storage.ts with:
+1. saveApiKey(key, provider, model) - chrome.storage.sync
+2. getApiKey() - retrieve API config
+3. saveErrors(errors) - chrome.storage.local
+4. getErrors() - retrieve errors
+5. clearErrors() - remove all errors
+6. savePEConfig(config) - chrome.storage.local
+7. getPEConfig() - retrieve PE data
+8. clearPEConfig() - remove PE data
+9. All functions return Promises
+10. Error handling and TypeScript types
+```
+
+---
+
+## 🧪 Testing Checklist
+
+- [ ] Extension loads without errors
+- [ ] Captures console.error from any website
+- [ ] Captures console.warn from any website
+- [ ] Captures uncaught exceptions
+- [ ] Captures unhandled promise rejections
+- [ ] Stores errors in chrome.storage
+- [ ] Detects PushEngage SDK correctly
+- [ ] Fetches PE config successfully
+- [ ] Stores PE config in chrome.storage
+- [ ] API key saves and loads correctly
+- [ ] Chat interface works in Debug Mode
+- [ ] Chat interface works in PushEngage Mode
+- [ ] AI responses stream in real-time
+- [ ] Error context included in debug prompts
+- [ ] PE context included in pushengage prompts
+- [ ] Query suggestions populate chat
+- [ ] PE config viewer displays all sections
+- [ ] Campaign summary shows correct data
+- [ ] Markdown renders correctly
+- [ ] Settings persist across sessions
+- [ ] Clear errors works
+- [ ] Clear PE cache works
+- [ ] Mode switching works
+- [ ] Export functions work
+- [ ] Extension popup opens quickly (<500ms)
+- [ ] No memory leaks after extended use
+
+---
+
+## 📚 Documentation Requirements
+
+Create README.md with:
+1. Installation instructions
+2. How to get API keys (OpenAI, Gemini, Anthropic)
+3. Feature overview with screenshots:
+   - Error debugging
+   - PushEngage integration
+4. Usage guide:
+   - Debugging errors
+   - Querying PushEngage data
+5. Privacy policy (data stays local)
+6. Troubleshooting section
+7. Development setup guide
+8. Contributing guidelines
+9. Example queries for both modes
+
+---
+
+## 🔒 Security & Privacy
+
+- API keys stored in chrome.storage.sync (encrypted by Chrome)
+- No data sent to external servers except LLM APIs
+- No telemetry or analytics
+- Content script runs in isolated context
+- CSP configured in manifest
+- API keys never exposed to content scripts
+- HTTPS-only API endpoints
+- PE data stays local in extension storage
+
+---
+
+## 📊 Success Metrics
+
+- Time to first suggestion: < 3 seconds
+- Extension size: < 1MB
+- Memory usage: < 50MB
+- Error capture accuracy: 99%+
+- PE detection accuracy: 100%
+- Chat response time: < 2 seconds (first chunk)
+- User satisfaction: 4.5+ stars
+
+---
+
+## 🎯 Future Enhancements (Phase 4+)
+
+### Error Debugging Enhancements:
+- [ ] Network error capture
+- [ ] Performance monitoring
+- [ ] Error analytics dashboard
+- [ ] Share error reports
+- [ ] Error grouping by type
+- [ ] Integration with GitHub Issues
+- [ ] Source map support
+
+### PushEngage Enhancements:
+- [ ] Live PE data updates (websocket)
+- [ ] Campaign comparison tool
+- [ ] Historical data tracking
+- [ ] Multi-site PE management
+- [ ] Export PE reports as PDF
+- [ ] Campaign performance analytics
+- [ ] Subscriber growth tracking
+
+### General Enhancements:
+- [ ] Browser sync across devices
+- [ ] Dark mode
+- [ ] Custom system prompts
+- [ ] Keyboard shortcuts
+- [ ] Voice input for queries
+- [ ] Multi-language support
+
+---
+
+## 📝 Example Queries
+
+### Debug Mode Queries:
+- "What's causing this TypeError?"
+- "How do I fix this 'undefined is not a function' error?"
+- "Explain this stack trace step by step"
+- "Show me a code example to fix this"
+- "What does this error mean in simple terms?"
+- "How can I prevent this error in the future?"
+
+### PushEngage Mode Queries:
+- "Show me all active campaigns"
+- "What are my cart abandonment settings?"
+- "How many campaigns do I have in total?"
+- "List all browse abandonment campaigns"
+- "What's my chicklet bell color and position?"
+- "Is geo location enabled on my site?"
+- "What's my site URL and ID?"
+- "Explain my opt-in configuration"
+- "How many segments do I have configured?"
+- "What are my subscriber attributes?"
+- "Show me campaign statistics"
+- "Is subscription analytics enabled?"
+
+---
+
+## 📝 Notes for Cursor AI
+
+**Development Priority:**
+1. First: Content script + background worker (error capture + PE detection)
+2. Then: Type definitions (errors + PushEngage)
+3. Then: PushEngage service layer
+4. Then: Basic popup UI (error list + PE panel)
+5. Then: Chat interface with AI Client (dual mode)
+6. Finally: Settings, polish, and testing
+
+**Key Files to Generate First:**
+1. `manifest.json`
+2. `src/types/index.ts`
+3. `src/types/pushEngage.ts`
+4. `src/content/content.ts`
+5. `src/background/background.ts`
+6. `src/services/pushEngage.ts`
+7. `src/utils/llm-providers.ts`
+8. `src/utils/storage.ts`
+9. `src/popup/App.tsx`
+10. `src/popup/components/ChatInterface.tsx`
+11. `src/popup/components/PushEngagePanel.tsx`
+
+**TanStack AI Client Configuration:**
+- Use AIClient class from `@tanstack/ai-client`
+- Configure with provider ('openai' | 'anthropic' | 'google')
+- Use client.chat.stream() for streaming responses
+- Handle onChunk callback for real-time updates
+- Build appropriate system prompts for each mode
+- Implement proper error handling
+
+**PushEngage Integration:**
+- Detect SDK: `typeof window.PushEngage !== 'undefined'`
+- Fetch config: `PushEngage.getAppConfig()`
+- Handle both promise and direct return values
+- Store in chrome.storage.local
+- Build readable context for AI
+- Support both debug and pushengage modes
+
+**Testing Strategy:**
+1. Test error capture on simple HTML page with intentional errors
+2. Test on production websites (Twitter, GitHub, etc.)
+3. Test PE detection on sites with PushEngage installed
+4. Test PE config fetching and parsing
+5. Verify storage limits (50 errors max)
+6. Test with all 3 LLM providers
+7. Test both debug and pushengage chat modes
+8. Test mode switching
+9. Test query suggestions
+10. Test export functions
+
+---
+
+## ✨ End Goal
+
+A production-ready Chrome extension that serves as an all-in-one developer assistant:
+
+**Core Features:**
+- ✅ Captures all console errors automatically
+- ✅ Provides AI-powered debugging suggestions
+- ✅ Interactive chat interface for debugging
+
+**PushEngage Features:**
+- ✅ Detects and integrates with PushEngage SDK
+- ✅ Queries PushEngage configuration in natural language
+- ✅ Displays campaign summaries and analytics
+- ✅ Provides AI insights about PE setup
+
+**Technical Excellence:**
+- ✅ Works with multiple LLM providers (OpenAI, Gemini, Anthropic)
+- ✅ Uses TanStack AI Client for robust AI communication
+- ✅ Dual-mode chat (Debug + PushEngage)
+- ✅ Requires zero backend infrastructure
+- ✅ Respects user privacy (all data local)
+- ✅ Professional UI/UX with Tailwind CSS
+- ✅ TypeScript for type safety
+- ✅ Comprehensive error handling
+
+**Developer Experience:**
+- ✅ Helps debug JavaScript errors quickly
+- ✅ Helps understand PushEngage configuration
+- ✅ Query suggestions for common questions
+- ✅ Export capabilities for reporting
+- ✅ Fast and responsive (<500ms load time)content}
+              
