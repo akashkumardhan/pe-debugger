@@ -44,13 +44,17 @@ function buildSystemPrompt(
 ): string {
   const toolsDescription = `
 You have access to the following tools:
-- get_subscription_details: Get PushEngage subscription and configuration details
+- get_subscription_details: Get PushEngage subscription and configuration details from the current page
+- fetch_pushengage_docs: Search PushEngage Web SDK documentation for API methods, code examples, and usage guides
 - scrape_website: Scrape and extract content from a website URL
 - update_ui: Display notifications in the extension popup
 - save_to_storage: Save data to browser storage
 - analyze_error: Analyze a captured console error
 
-When appropriate, use these tools to help answer questions.
+IMPORTANT TOOL USAGE GUIDELINES:
+- When users ask about PushEngage JavaScript API, SDK methods, code examples, or "how to" questions → Use "fetch_pushengage_docs" tool with a relevant query
+- When users ask about their specific PushEngage configuration, campaigns, settings → Use "get_subscription_details" tool
+- Use tools proactively when they can help answer the question
 `;
 
   // Debug mode - with or without selected error
@@ -109,18 +113,23 @@ Use markdown formatting for code blocks and be concise but thorough.`;
 
 ${toolsDescription}
 
-## PUSHENGAGE CONFIGURATION DATA
+## PUSHENGAGE CONFIGURATION DATA (Current Site)
 
 ${peContext}
 
 ## RESPONSE GUIDELINES:
 
-1. Answer questions based on the configuration data provided above
-2. Use the get_subscription_details tool to fetch fresh data if needed
-3. Use the scrape_website tool to fetch PushEngage documentation from https://pushengage.com/api/web-sdk/ if needed
-4. Be concise, accurate, and helpful
-5. Use markdown formatting for better readability
-6. When listing campaigns or settings, format them clearly`;
+1. For questions about THIS SITE'S specific configuration/campaigns/settings → Answer from the data above OR use "get_subscription_details" tool
+2. For questions about PushEngage JavaScript SDK/API methods, code examples, how to implement features → ALWAYS use "fetch_pushengage_docs" tool with a search query like "addSegment", "addToCart", "subscribe", etc.
+3. Be concise, accurate, and helpful
+4. Use markdown formatting for better readability
+5. When showing code examples, include the full code with PushEngage.push() wrapper
+
+Examples of when to use each tool:
+- "Is this a Shopify site?" → Answer from config data above
+- "How do I add a segment?" → Use fetch_pushengage_docs with query "addSegment"
+- "What campaigns are active?" → Answer from config data above  
+- "Show me cart abandonment code" → Use fetch_pushengage_docs with query "addToCart cart"`;
     } else {
       return `You are a helpful assistant specialized in PushEngage push notification platform.
 
@@ -130,10 +139,12 @@ ${toolsDescription}
 
 1. **PushEngage Knowledge** - Answer questions about PushEngage features, setup, and configuration
 2. **Campaign Guidance** - Help with browse abandonment, cart abandonment, and other campaign types
-3. **Integration Help** - Assist with SDK integration and troubleshooting
+3. **SDK Documentation** - Use the "fetch_pushengage_docs" tool to get accurate JavaScript API documentation
 4. **Best Practices** - Share web push notification best practices
 
-PushEngage is not detected on the current page. You can still help with general PushEngage questions. For specific configuration analysis, visit a page with PushEngage SDK installed.
+PushEngage is not detected on the current page. You can still help with general PushEngage questions and SDK documentation.
+
+IMPORTANT: For any JavaScript SDK/API questions, ALWAYS use the "fetch_pushengage_docs" tool to provide accurate code examples.
 
 Use markdown formatting and be helpful.`;
     }
@@ -197,6 +208,17 @@ export function useAIChat(options: UseAIChatOptions): UseAIChatReturn {
   const [error, setError] = useState<string | null>(null);
   const adapterRef = useRef<AIAdapter | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Use ref to track current messages to avoid stale closure issues
+  const messagesRef = useRef<ChatMessage[]>([]);
+  
+  // Track current request ID to prevent stale updates
+  const currentRequestIdRef = useRef<number>(0);
+  
+  // Keep messagesRef in sync with messages state
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Register UI update callback
   useEffect(() => {
@@ -217,12 +239,42 @@ export function useAIChat(options: UseAIChatOptions): UseAIChatReturn {
       return;
     }
 
+    // Abort any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create unique request ID to prevent stale updates
+    const requestId = Date.now();
+    currentRequestIdRef.current = requestId;
+    
+    console.log('[AI Chat] Starting request:', requestId, 'content:', content.substring(0, 50));
+
     setIsLoading(true);
     setError(null);
 
-    // Add user message immediately
+    // Helper to check if this request is still current
+    const isCurrentRequest = () => currentRequestIdRef.current === requestId;
+
+    // Build the user message
     const userMessage: ChatMessage = { role: 'user', content: content.trim() };
-    setMessages(prev => [...prev, userMessage]);
+    
+    // IMPORTANT: Capture current messages BEFORE setState to avoid async timing issues
+    // This ensures we have the correct conversation history for the API call
+    const previousMessages = [...messagesRef.current];
+    
+    // Build the messages array for the API call SYNCHRONOUSLY
+    const messagesForAPI = [...previousMessages, userMessage];
+    
+    // Calculate assistant message index
+    const assistantMessageIndex = messagesForAPI.length;
+    
+    // Now update state with user message + placeholder
+    const newMessagesWithPlaceholder = [...messagesForAPI, { role: 'assistant' as const, content: '' }];
+    messagesRef.current = newMessagesWithPlaceholder;
+    setMessages(newMessagesWithPlaceholder);
+    
+    console.log('[AI Chat] Messages for API:', messagesForAPI.length, 'assistantIndex:', assistantMessageIndex);
 
     try {
       // Create adapter for selected provider
@@ -238,17 +290,62 @@ export function useAIChat(options: UseAIChatOptions): UseAIChatReturn {
 
       // Build system prompt with context
       const systemPrompt = buildSystemPrompt(mode, selectedError, peData);
-
-      // Prepare all messages for the API
+      
+      // Prepare all messages for the API (use the synchronously captured messages)
       const allMessages: AdapterMessage[] = [
         { role: 'system', content: systemPrompt },
-        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-        { role: 'user', content: content.trim() },
+        ...messagesForAPI.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ];
+      
+      console.log('[AI Chat] Sending', allMessages.length, 'messages to API (user messages:', messagesForAPI.length, ')');
 
       // Stream the response
       let assistantResponse = '';
       let pendingToolCall: { id: string; name: string; arguments: string } | null = null;
+      const toolResults: { name: string; result: unknown }[] = [];
+      let chunkCount = 0;
+
+      // Helper to update assistant message - more robust version
+      const updateAssistantMessage = (content: string) => {
+        // Skip update if this request is no longer current
+        if (!isCurrentRequest()) {
+          console.log('[AI Chat] Skipping stale update for request:', requestId);
+          return;
+        }
+
+        setMessages(prev => {
+          const newMessages = [...prev];
+          // Find and update the last assistant message (more robust than index-based)
+          let updated = false;
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].role === 'assistant') {
+              newMessages[i] = { role: 'assistant', content };
+              updated = true;
+              break;
+            }
+          }
+          if (!updated) {
+            console.log('[AI Chat] Warning: No assistant message found to update');
+          }
+          messagesRef.current = newMessages;
+          return newMessages;
+        });
+      };
+
+      // Helper to execute a tool and collect result
+      const executeTool = async (toolCall: { id: string; name: string; arguments: string }) => {
+        try {
+          const args = JSON.parse(toolCall.arguments);
+          const result = await executeToolCall(toolCall.name, args);
+          toolResults.push({ name: toolCall.name, result });
+          
+          // Show a brief loading indicator
+          updateAssistantMessage('🔧 Fetching documentation...');
+        } catch (e) {
+          console.error('Tool execution error:', e);
+          toolResults.push({ name: toolCall.name, result: { error: 'Tool execution failed' } });
+        }
+      };
 
       const stream = adapter.stream(allMessages, {
         tools: allToolDefinitions,
@@ -256,21 +353,16 @@ export function useAIChat(options: UseAIChatOptions): UseAIChatReturn {
       });
 
       for await (const chunk of stream) {
+        chunkCount++;
+        
+        // Log first few chunks for debugging
+        if (chunkCount <= 3) {
+          console.log('[AI Chat] Chunk', chunkCount, ':', JSON.stringify(chunk).substring(0, 200));
+        }
+        
         if (chunk.type === 'text' && chunk.content) {
           assistantResponse += chunk.content;
-          
-          // Update messages with streaming response
-          setMessages(prev => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage?.role === 'assistant') {
-              return [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: assistantResponse },
-              ];
-            } else {
-              return [...prev, { role: 'assistant', content: assistantResponse }];
-            }
-          });
+          updateAssistantMessage(assistantResponse);
         }
 
         if (chunk.type === 'tool_call' && chunk.toolCall) {
@@ -280,26 +372,7 @@ export function useAIChat(options: UseAIChatOptions): UseAIChatReturn {
           } else {
             // Execute previous tool call if exists
             if (pendingToolCall) {
-              try {
-                const args = JSON.parse(pendingToolCall.arguments);
-                const result = await executeToolCall(pendingToolCall.name, args);
-                
-                // Add tool result to response
-                assistantResponse += `\n\n**Tool Result (${pendingToolCall.name}):**\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`;
-                
-                setMessages(prev => {
-                  const lastMessage = prev[prev.length - 1];
-                  if (lastMessage?.role === 'assistant') {
-                    return [
-                      ...prev.slice(0, -1),
-                      { role: 'assistant', content: assistantResponse },
-                    ];
-                  }
-                  return prev;
-                });
-              } catch (e) {
-                console.error('Tool execution error:', e);
-              }
+              await executeTool(pendingToolCall);
             }
             
             pendingToolCall = {
@@ -310,51 +383,115 @@ export function useAIChat(options: UseAIChatOptions): UseAIChatReturn {
           }
         }
       }
+      
+      console.log('[AI Chat] Stream complete. Chunks:', chunkCount, 'Response length:', assistantResponse.length, 'Tools:', toolResults.length);
 
       // Execute final pending tool call
       if (pendingToolCall) {
-        try {
-          const args = JSON.parse(pendingToolCall.arguments);
-          const result = await executeToolCall(pendingToolCall.name, args);
-          
-          assistantResponse += `\n\n**Tool Result (${pendingToolCall.name}):**\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`;
-          
-          setMessages(prev => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage?.role === 'assistant') {
-              return [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: assistantResponse },
-              ];
-            }
-            return prev;
-          });
-        } catch (e) {
-          console.error('Tool execution error:', e);
+        await executeTool(pendingToolCall);
+      }
+
+      // If we have tool results and limited/no text response, make a follow-up call
+      // to get the AI to generate a proper response using the tool results
+      if (toolResults.length > 0 && isCurrentRequest()) {
+        // Build a follow-up prompt with tool results
+        const toolResultsContext = toolResults.map(tr => {
+          // Extract the most useful parts from the tool result
+          const result = tr.result as any;
+          if (tr.name === 'fetch_pushengage_docs' && result?.success && result?.documentation?.formattedContent) {
+            return `**Tool: ${tr.name}**\n\n${result.documentation.formattedContent}`;
+          }
+          return `**Tool: ${tr.name}**\n\`\`\`json\n${JSON.stringify(tr.result, null, 2)}\n\`\`\``;
+        }).join('\n\n');
+
+        // Make follow-up call to get AI to interpret tool results
+        const followUpMessages: AdapterMessage[] = [
+          ...allMessages,
+          { 
+            role: 'assistant', 
+            content: `I'll look that up in the documentation.\n\n[Tool executed: ${toolResults.map(t => t.name).join(', ')}]` 
+          },
+          { 
+            role: 'user', 
+            content: `Based on the documentation below, please provide a clear, concise answer to the original question. Show the relevant code example and explain it briefly. Don't show raw JSON.\n\n${toolResultsContext}` 
+          },
+        ];
+
+        // Stream the follow-up response
+        assistantResponse = '';
+        updateAssistantMessage(''); // Clear loading indicator
+        
+        // Check again before making follow-up call
+        if (!isCurrentRequest()) {
+          return;
         }
+        
+        const followUpStream = adapter.stream(followUpMessages, {
+          signal: abortControllerRef.current?.signal,
+        });
+
+        for await (const chunk of followUpStream) {
+          // Check if request is still current before each update
+          if (!isCurrentRequest()) {
+            break;
+          }
+          if (chunk.type === 'text' && chunk.content) {
+            assistantResponse += chunk.content;
+            updateAssistantMessage(assistantResponse);
+          }
+        }
+      }
+
+      // Final response handling
+      if (isCurrentRequest()) {
+        if (assistantResponse) {
+          // Ensure final response is displayed
+          console.log('[AI Chat] Final response update, length:', assistantResponse.length);
+          updateAssistantMessage(assistantResponse);
+        } else if (toolResults.length === 0) {
+          // No response AND no tools - show error message
+          console.log('[AI Chat] No response received, showing error');
+          updateAssistantMessage('⚠️ No response received from AI. Please try again.');
+        }
+        // If toolResults.length > 0 but no assistantResponse, the follow-up call should have handled it
       }
 
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
+        // Don't modify state for aborted requests
+        return;
+      }
+
+      // Only show error if this is still the current request
+      if (!isCurrentRequest()) {
         return;
       }
 
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      console.log('[AI Chat] Error:', errorMessage);
       setError(errorMessage);
       
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `❌ **Error:** ${errorMessage}\n\nPlease check your API key and try again.`,
-        },
-      ]);
+      // Update the placeholder with error message (find last assistant message)
+      setMessages(prev => {
+        const newMessages = [...prev];
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant') {
+            newMessages[i] = {
+              role: 'assistant',
+              content: `❌ **Error:** ${errorMessage}\n\nPlease check your API key and try again.`,
+            };
+            break;
+          }
+        }
+        messagesRef.current = newMessages;
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
       adapterRef.current = null;
       abortControllerRef.current = null;
     }
-  }, [apiConfig, messages, mode, selectedError, peData]);
+  }, [apiConfig, mode, selectedError, peData]);
 
   /**
    * Clear all messages

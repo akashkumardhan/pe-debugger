@@ -1,12 +1,13 @@
 // DevDebug AI - Background Service Worker
 import type { ConsoleError, PEAppConfig } from '../types';
 
-interface StorageData {
+// Storage data interface for reference (used implicitly via chrome.storage)
+export type StorageData = {
   errors: ConsoleError[];
   peConfig: PEAppConfig | null;
   peAvailable: boolean;
   peTabUrls: Record<number, boolean>;
-}
+};
 
 const MAX_ERRORS = 50;
 
@@ -108,7 +109,7 @@ async function handleConsoleError(error: ConsoleError, tabId?: number): Promise<
 // Handle PushEngage detection
 async function handlePEDetection(
   hasPushEngage: boolean,
-  url: string,
+  _url: string,
   tabId?: number
 ): Promise<void> {
   try {
@@ -128,7 +129,7 @@ async function handlePEDetection(
 }
 
 // Handle PushEngage config
-async function handlePEConfig(config: PEAppConfig, tabId?: number): Promise<void> {
+async function handlePEConfig(config: PEAppConfig, _tabId?: number): Promise<void> {
   if (!config) return;
 
   try {

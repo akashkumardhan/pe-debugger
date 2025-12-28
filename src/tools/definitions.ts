@@ -22,6 +22,65 @@ import {
 // GET SUBSCRIPTION DETAILS TOOL
 // ============================================================
 
+const getSubscriptionDetailsInputSchema = z.object({
+  includeSettings: z.boolean()
+    .optional()
+    .default(true)
+    .describe('Whether to include site settings in the response'),
+  includeCampaigns: z.boolean()
+    .optional()
+    .default(true)
+    .describe('Whether to include campaign details in the response'),
+});
+
+const getSubscriptionDetailsOutputSchema = z.object({
+  success: z.boolean(),
+  available: z.boolean().describe('Whether PushEngage SDK is available on the page'),
+  data: z.object({
+    backInStockAlerts: z
+      .array(CampaignSchema)
+      .describe('Back-in-stock notification campaigns'),
+
+    browseAbandonments: z
+      .array(CampaignSchema)
+      .describe('Browse abandonment campaigns'),
+
+    cartAbandonments: z
+      .array(CampaignSchema)
+      .describe('Cart abandonment campaigns'),
+
+    chatWidgets: z
+      .array(z.any())
+      .describe('Chat widget configurations'),
+
+    customTriggerCampaigns: z
+      .array(CampaignSchema)
+      .describe('Custom trigger based campaigns'),
+
+    priceDropAlerts: z
+      .array(CampaignSchema)
+      .describe('Price drop alert campaigns'),
+
+    segments: z
+      .array(SegmentSchema)
+      .describe('Audience segmentation rules'),
+
+    site: SiteSchema.describe('Site metadata'),
+
+    siteSettings: SiteSettingsSchema.describe(
+      'Complete site configuration and UI settings'
+    ),
+
+    subscriberAttributes: z
+      .array(z.any())
+      .describe('Custom subscriber attributes'),
+  })
+  .optional()
+  .describe('subscription and site related details and configuration data'),
+
+  error: z.string().optional(),
+});
+
 /**
  * Get PushEngage subscription details from the current page.
  * Uses PushEngage.getAppConfig() to retrieve configuration.
@@ -29,68 +88,46 @@ import {
 export const getSubscriptionDetailsDef = toolDefinition({
   name: 'get_subscription_details',
   description: 'Get PushEngage subscription and configuration details from the current webpage. Returns campaign info, site settings, segments, and more.',
-  inputSchema: z.object({
-    includeSettings: z.boolean()
-      .optional()
-      .default(true)
-      .describe('Whether to include site settings in the response'),
-    includeCampaigns: z.boolean()
-      .optional()
-      .default(true)
-      .describe('Whether to include campaign details in the response'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    available: z.boolean().describe('Whether PushEngage SDK is available on the page'),
-    data: z.object({
-      backInStockAlerts: z
-        .array(CampaignSchema)
-        .describe('Back-in-stock notification campaigns'),
-
-      browseAbandonments: z
-        .array(CampaignSchema)
-        .describe('Browse abandonment campaigns'),
-
-      cartAbandonments: z
-        .array(CampaignSchema)
-        .describe('Cart abandonment campaigns'),
-
-      chatWidgets: z
-        .array(z.any())
-        .describe('Chat widget configurations'),
-
-      customTriggerCampaigns: z
-        .array(CampaignSchema)
-        .describe('Custom trigger based campaigns'),
-
-      priceDropAlerts: z
-        .array(CampaignSchema)
-        .describe('Price drop alert campaigns'),
-
-      segments: z
-        .array(SegmentSchema)
-        .describe('Audience segmentation rules'),
-
-      site: SiteSchema.describe('Site metadata'),
-
-      siteSettings: SiteSettingsSchema.describe(
-        'Complete site configuration and UI settings'
-      ),
-
-      subscriberAttributes: z
-        .array(z.any())
-        .describe('Custom subscriber attributes'),
-    })
-    .optional()
-    .describe('subscription and site related details and configuration data'),
-
-    error: z.string().optional(),
-  }),
+  inputSchema: getSubscriptionDetailsInputSchema,
+  outputSchema: getSubscriptionDetailsOutputSchema,
 });
+
+export type GetSubscriptionDetailsInput = z.infer<typeof getSubscriptionDetailsInputSchema>;
+export type GetSubscriptionDetailsOutput = z.infer<typeof getSubscriptionDetailsOutputSchema>;
 
 // ============================================================
 // SCRAPE WEBSITE TOOL
 // ============================================================
+
+// Define schemas separately for proper type inference
+const scrapeWebsiteInputSchema = z.object({
+  url: z.url().describe('The URL to scrape'),
+  extractType: z.enum(['text', 'links', 'headings', 'all'])
+    .optional()
+    .default('all')
+    .describe('What type of content to extract'),
+  selector: z.string()
+    .optional()
+    .describe('Optional CSS selector to target specific content'),
+});
+
+const scrapeWebsiteOutputSchema = z.object({
+  success: z.boolean(),
+  url: z.string(),
+  title: z.string().optional(),
+  content: z.object({
+    text: z.string().optional(),
+    headings: z.array(z.object({
+      level: z.number(),
+      text: z.string(),
+    })).optional(),
+    links: z.array(z.object({
+      text: z.string(),
+      href: z.string(),
+    })).optional(),
+  }).optional(),
+  error: z.string().optional(),
+});
 
 /**
  * Scrape content from a website URL.
@@ -99,38 +136,32 @@ export const getSubscriptionDetailsDef = toolDefinition({
 export const scrapeWebsiteDef = toolDefinition({
   name: 'scrape_website',
   description: 'Scrape and extract content from a website URL. Can extract text content, links, headings, and structured data.',
-  inputSchema: z.object({
-    url: z.url().describe('The URL to scrape'),
-    extractType: z.enum(['text', 'links', 'headings', 'all'])
-      .optional()
-      .default('all')
-      .describe('What type of content to extract'),
-    selector: z.string()
-      .optional()
-      .describe('Optional CSS selector to target specific content'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    url: z.string(),
-    title: z.string().optional(),
-    content: z.object({
-      text: z.string().optional(),
-      headings: z.array(z.object({
-        level: z.number(),
-        text: z.string(),
-      })).optional(),
-      links: z.array(z.object({
-        text: z.string(),
-        href: z.string(),
-      })).optional(),
-    }).optional(),
-    error: z.string().optional(),
-  }),
+  inputSchema: scrapeWebsiteInputSchema,
+  outputSchema: scrapeWebsiteOutputSchema,
 });
+
+// Export schema types directly for proper inference
+export type ScrapeWebsiteInput = z.infer<typeof scrapeWebsiteInputSchema>;
+export type ScrapeWebsiteOutput = z.infer<typeof scrapeWebsiteOutputSchema>;
 
 // ============================================================
 // UPDATE UI TOOL
 // ============================================================
+
+const updateUIInputSchema = z.object({
+  message: z.string().describe('Message to display to the user'),
+  type: z.enum(['success', 'error', 'info', 'warning'])
+    .describe('Type of message (affects styling)'),
+  duration: z.number()
+    .optional()
+    .default(3000)
+    .describe('How long to show the message in milliseconds'),
+});
+
+const updateUIOutputSchema = z.object({
+  success: z.boolean(),
+  displayed: z.boolean(),
+});
 
 /**
  * Update the extension popup UI with a message.
@@ -138,24 +169,31 @@ export const scrapeWebsiteDef = toolDefinition({
 export const updateUIDef = toolDefinition({
   name: 'update_ui',
   description: 'Display a notification or message in the extension popup UI',
-  inputSchema: z.object({
-    message: z.string().describe('Message to display to the user'),
-    type: z.enum(['success', 'error', 'info', 'warning'])
-      .describe('Type of message (affects styling)'),
-    duration: z.number()
-      .optional()
-      .default(3000)
-      .describe('How long to show the message in milliseconds'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    displayed: z.boolean(),
-  }),
+  inputSchema: updateUIInputSchema,
+  outputSchema: updateUIOutputSchema,
 });
+
+export type UpdateUIInput = z.infer<typeof updateUIInputSchema>;
+export type UpdateUIOutput = z.infer<typeof updateUIOutputSchema>;
 
 // ============================================================
 // SAVE TO STORAGE TOOL
 // ============================================================
+
+const saveToStorageInputSchema = z.object({
+  key: z.string().describe('Storage key'),
+  value: z.string().describe('Value to store (will be JSON stringified if object)'),
+  storageType: z.enum(['local', 'sync'])
+    .optional()
+    .default('local')
+    .describe('Chrome storage type - local or sync'),
+});
+
+const saveToStorageOutputSchema = z.object({
+  success: z.boolean(),
+  key: z.string(),
+  error: z.string().optional(),
+});
 
 /**
  * Save data to Chrome extension storage.
@@ -163,24 +201,33 @@ export const updateUIDef = toolDefinition({
 export const saveToStorageDef = toolDefinition({
   name: 'save_to_storage',
   description: 'Save data to browser storage for persistence',
-  inputSchema: z.object({
-    key: z.string().describe('Storage key'),
-    value: z.string().describe('Value to store (will be JSON stringified if object)'),
-    storageType: z.enum(['local', 'sync'])
-      .optional()
-      .default('local')
-      .describe('Chrome storage type - local or sync'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    key: z.string(),
-    error: z.string().optional(),
-  }),
+  inputSchema: saveToStorageInputSchema,
+  outputSchema: saveToStorageOutputSchema,
 });
+
+export type SaveToStorageInput = z.infer<typeof saveToStorageInputSchema>;
+export type SaveToStorageOutput = z.infer<typeof saveToStorageOutputSchema>;
 
 // ============================================================
 // ANALYZE ERROR TOOL
 // ============================================================
+
+const analyzeErrorInputSchema = z.object({
+  errorId: z.number().describe('ID of the captured error to analyze'),
+});
+
+const analyzeErrorOutputSchema = z.object({
+  success: z.boolean(),
+  error: z.object({
+    message: z.string(),
+    type: z.string(),
+    filename: z.string(),
+    lineno: z.number(),
+    stack: z.string(),
+  }).optional(),
+  analysis: z.string().optional(),
+  notFound: z.boolean().optional(),
+});
 
 /**
  * Analyze a captured console error and provide debugging insights.
@@ -188,22 +235,128 @@ export const saveToStorageDef = toolDefinition({
 export const analyzeErrorDef = toolDefinition({
   name: 'analyze_error',
   description: 'Analyze a console error and provide debugging suggestions',
-  inputSchema: z.object({
-    errorId: z.number().describe('ID of the captured error to analyze'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    error: z.object({
-      message: z.string(),
-      type: z.string(),
-      filename: z.string(),
-      lineno: z.number(),
-      stack: z.string(),
-    }).optional(),
-    analysis: z.string().optional(),
-    notFound: z.boolean().optional(),
-  }),
+  inputSchema: analyzeErrorInputSchema,
+  outputSchema: analyzeErrorOutputSchema,
 });
+
+export type AnalyzeErrorInput = z.infer<typeof analyzeErrorInputSchema>;
+export type AnalyzeErrorOutput = z.infer<typeof analyzeErrorOutputSchema>;
+
+// ============================================================
+// FETCH PUSHENGAGE DOCS TOOL
+// ============================================================
+
+const fetchPushEngageDocsInputSchema = z.object({
+  query: z.string()
+    .optional()
+    .describe('Search query to find relevant documentation sections. If provided, returns only matching sections. If omitted, returns full documentation.'),
+  forceRefresh: z.boolean()
+    .optional()
+    .default(false)
+    .describe('Force re-fetch documentation from the web, ignoring cache'),
+  maxPages: z.number()
+    .optional()
+    .default(50)
+    .describe('Maximum number of documentation pages to scrape (default: 50)'),
+  maxDepth: z.number()
+    .optional()
+    .default(3)
+    .describe('Maximum link depth for recursive scraping (default: 3)'),
+});
+
+const fetchPushEngageDocsOutputSchema = z.object({
+  success: z.boolean()
+    .describe('Whether the operation was successful'),
+  cached: z.boolean()
+    .describe('Whether the result came from cache'),
+  lastUpdated: z.number()
+    .optional()
+    .describe('Timestamp when documentation was last fetched'),
+  expiresAt: z.number()
+    .optional()
+    .describe('Timestamp when cache expires'),
+  totalPages: z.number()
+    .optional()
+    .describe('Total number of pages scraped'),
+  query: z.string()
+    .optional()
+    .describe('The search query used (if any)'),
+  documentation: z.object({
+    baseUrl: z.string()
+      .describe('Base URL of the documentation'),
+    pages: z.array(z.object({
+      title: z.string()
+        .describe('Page title'),
+      url: z.string()
+        .describe('Page URL'),
+      sections: z.array(z.object({
+        heading: z.string()
+          .describe('Section heading'),
+        level: z.number()
+          .describe('Heading level (1-6)'),
+        content: z.string()
+          .describe('Section text content'),
+        codeExamples: z.array(z.object({
+          language: z.string()
+            .describe('Code language'),
+          code: z.string()
+            .describe('Code content'),
+          description: z.string()
+            .optional()
+            .describe('Code description'),
+        }))
+          .optional()
+          .describe('Code examples in this section'),
+        parameters: z.array(z.object({
+          name: z.string()
+            .describe('Parameter name'),
+          type: z.string()
+            .describe('Parameter type'),
+          required: z.boolean()
+            .describe('Whether required'),
+          description: z.string()
+            .describe('Parameter description'),
+        }))
+          .optional()
+          .describe('API parameters in this section'),
+      }))
+        .describe('Content sections'),
+      relevanceScore: z.number()
+        .optional()
+        .describe('Relevance score for search results'),
+    }))
+      .describe('Documentation pages (or relevant sections if query provided)'),
+    formattedContent: z.string()
+      .optional()
+      .describe('Pre-formatted documentation content for AI consumption'),
+  })
+    .optional()
+    .describe('Extracted documentation content'),
+  error: z.string()
+    .optional()
+    .describe('Error message if operation failed'),
+});
+
+/**
+ * Fetch and analyze PushEngage Web SDK documentation.
+ * Scrapes content from https://pushengage.com/api/web-sdk/ and subpages.
+ * Caches results for 24 hours to avoid repeated network requests.
+ * AI responses must be grounded ONLY in the extracted documentation.
+ */
+export const fetchPushEngageDocsDef = toolDefinition({
+  name: 'fetch_pushengage_docs',
+  description: `Fetch PushEngage Web SDK documentation from https://pushengage.com/api/web-sdk/ and its subpages. 
+Use this tool to answer questions about PushEngage JavaScript API methods, parameters, code examples, and SDK usage.
+The tool scrapes documentation pages, extracts structured content (headings, API descriptions, parameters, code examples), 
+and returns relevant sections based on the query. Results are cached for 24 hours.
+IMPORTANT: All AI responses about PushEngage SDK must be based ONLY on the content returned by this tool.
+Do NOT use external knowledge or make assumptions beyond what is in the documentation.`,
+  inputSchema: fetchPushEngageDocsInputSchema,
+  outputSchema: fetchPushEngageDocsOutputSchema,
+});
+
+export type FetchPushEngageDocsInput = z.infer<typeof fetchPushEngageDocsInputSchema>;
+export type FetchPushEngageDocsOutput = z.infer<typeof fetchPushEngageDocsOutputSchema>;
 
 // ============================================================
 // EXPORT ALL DEFINITIONS
@@ -215,23 +368,10 @@ export const allToolDefinitions = [
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,
+  fetchPushEngageDocsDef,
 ];
 
-// Type exports for client implementations
-export type GetSubscriptionDetailsInput = z.infer<typeof getSubscriptionDetailsDef.inputSchema>;
-export type GetSubscriptionDetailsOutput = z.infer<typeof getSubscriptionDetailsDef.outputSchema>;
-
-export type ScrapeWebsiteInput = z.infer<typeof scrapeWebsiteDef.inputSchema>;
-export type ScrapeWebsiteOutput = z.infer<typeof scrapeWebsiteDef.outputSchema>;
-
-export type UpdateUIInput = z.infer<typeof updateUIDef.inputSchema>;
-export type UpdateUIOutput = z.infer<typeof updateUIDef.outputSchema>;
-
-export type SaveToStorageInput = z.infer<typeof saveToStorageDef.inputSchema>;
-export type SaveToStorageOutput = z.infer<typeof saveToStorageDef.outputSchema>;
-
-export type AnalyzeErrorInput = z.infer<typeof analyzeErrorDef.inputSchema>;
-export type AnalyzeErrorOutput = z.infer<typeof analyzeErrorDef.outputSchema>;
+// Note: All Input/Output types are exported inline with their schema definitions above
 
 // Re-export schemas from types for convenience
 export {
@@ -239,4 +379,13 @@ export {
   SegmentSchema,
   SiteSchema,
   SiteSettingsSchema,
+} from './types';
+
+// Re-export documentation schemas
+export {
+  DocSectionSchema,
+  DocCodeExampleSchema,
+  DocParameterSchema,
+  DocPageSchema,
+  DocCacheSchema,
 } from './types';

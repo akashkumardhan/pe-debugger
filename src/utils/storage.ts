@@ -1,5 +1,10 @@
 // Chrome Storage Utilities
 import type { ConsoleError, ApiConfig, PEAppConfig } from '../types';
+import type { DocCache } from '../tools/types';
+
+// ===== CONSTANTS =====
+const PE_DOCS_CACHE_KEY = 'pe_docs_cache';
+const DOCS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ===== API KEY MANAGEMENT =====
 
@@ -140,4 +145,118 @@ export async function getPrivacySettings(): Promise<PrivacySettings> {
 export async function savePrivacySettings(settings: PrivacySettings): Promise<void> {
   await chrome.storage.sync.set({ privacySettings: settings });
 }
+
+// ===== PUSHENGAGE DOCUMENTATION CACHE =====
+
+/**
+ * Save PushEngage documentation to cache
+ * @param docs - The documentation cache object
+ */
+export async function savePEDocs(docs: DocCache): Promise<void> {
+  try {
+    await chrome.storage.local.set({ [PE_DOCS_CACHE_KEY]: docs });
+  } catch (error) {
+    console.error('Failed to save PE docs cache:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get PushEngage documentation from cache
+ * @returns The cached documentation or null if not found/expired
+ */
+export async function getPEDocs(): Promise<DocCache | null> {
+  try {
+    const result = await chrome.storage.local.get(PE_DOCS_CACHE_KEY) as { [PE_DOCS_CACHE_KEY]?: DocCache };
+    const docs = result[PE_DOCS_CACHE_KEY];
+    
+    if (!docs) {
+      return null;
+    }
+    
+    return docs;
+  } catch (error) {
+    console.error('Failed to get PE docs cache:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if the documentation cache is valid (not expired)
+ * @returns Object with validity status and cache if valid
+ */
+export async function isPEDocsCacheValid(): Promise<{ valid: boolean; cache: DocCache | null; reason?: string }> {
+  const docs = await getPEDocs();
+  
+  if (!docs) {
+    return { valid: false, cache: null, reason: 'No cache found' };
+  }
+  
+  const now = Date.now();
+  
+  if (now > docs.expiresAt) {
+    return { valid: false, cache: docs, reason: 'Cache expired' };
+  }
+  
+  return { valid: true, cache: docs };
+}
+
+/**
+ * Clear the PushEngage documentation cache
+ */
+export async function clearPEDocsCache(): Promise<void> {
+  try {
+    await chrome.storage.local.remove(PE_DOCS_CACHE_KEY);
+  } catch (error) {
+    console.error('Failed to clear PE docs cache:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get cache metadata without loading full content
+ */
+export async function getPEDocsCacheInfo(): Promise<{
+  exists: boolean;
+  lastUpdated?: number;
+  expiresAt?: number;
+  totalPages?: number;
+  isExpired?: boolean;
+} | null> {
+  const docs = await getPEDocs();
+  
+  if (!docs) {
+    return { exists: false };
+  }
+  
+  const now = Date.now();
+  
+  return {
+    exists: true,
+    lastUpdated: docs.lastUpdated,
+    expiresAt: docs.expiresAt,
+    totalPages: docs.totalPages,
+    isExpired: now > docs.expiresAt,
+  };
+}
+
+/**
+ * Create a fresh cache object with proper timestamps
+ */
+export function createDocCache(baseUrl: string, pages: DocCache['pages']): DocCache {
+  const now = Date.now();
+  return {
+    version: 1,
+    lastUpdated: now,
+    expiresAt: now + DOCS_CACHE_TTL_MS,
+    baseUrl,
+    pages,
+    totalPages: pages.length,
+  };
+}
+
+/**
+ * Export constants for external use
+ */
+export { PE_DOCS_CACHE_KEY, DOCS_CACHE_TTL_MS };
 

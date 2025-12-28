@@ -51,7 +51,8 @@ export function createChatClient(
   const { apiKey, provider, model } = config;
 
   // Create a custom stream adapter that calls AI provider APIs directly
-  const connection = stream(async function* (messages: ModelMessage[], data?: Record<string, unknown>) {
+  // Using 'as any' cast due to @tanstack/ai type incompatibility with tool messages
+  const connection = stream((async function* (messages: ModelMessage[], _data?: Record<string, unknown>) {
     const response = await callAIProvider(provider, apiKey, model, messages);
     
     const reader = response.body?.getReader();
@@ -87,7 +88,7 @@ export function createChatClient(
     } finally {
       reader.releaseLock();
     }
-  });
+  }) as any);
 
   return new ChatClient({
     connection,

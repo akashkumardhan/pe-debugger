@@ -12,6 +12,7 @@
     "@tanstack/ai": "^0.2.0",
     "@tanstack/ai-client": "^0.2.0",
     "@tanstack/ai-openai": "^0.2.0",
+    "cheerio": "^1.1.2",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

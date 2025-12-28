@@ -4,6 +4,9 @@
  * These are the .client() implementations for each tool definition.
  * All tools execute in the browser context (no server required).
  * 
+ * Note: We use explicit type assertions because @tanstack/ai v0.2.0
+ * has issues with generic type inference in the .client() method.
+ * 
  * @see https://tanstack.com/ai
  */
 
@@ -13,6 +16,7 @@ import {
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,
+  fetchPushEngageDocsDef,
   type GetSubscriptionDetailsInput,
   type GetSubscriptionDetailsOutput,
   type ScrapeWebsiteInput,
@@ -23,9 +27,16 @@ import {
   type SaveToStorageOutput,
   type AnalyzeErrorInput,
   type AnalyzeErrorOutput,
+  type FetchPushEngageDocsInput,
+  type FetchPushEngageDocsOutput,
 } from './definitions';
 import { getPEStatus, getErrors } from '../utils/storage';
-import { pushEngageService } from '../services/pushEngage';
+import { 
+  searchEmbeddedDocs, 
+  formatDocsForAI, 
+  getAllDocsFormatted,
+  PUSHENGAGE_WEB_SDK_DOCS 
+} from './pushEngageDocsData';
 
 // ============================================================
 // GET SUBSCRIPTION DETAILS - Client Implementation
@@ -35,67 +46,37 @@ import { pushEngageService } from '../services/pushEngage';
  * Get PushEngage subscription details from stored config.
  * The content script fetches this via PushEngage.getAppConfig()
  */
-export const getSubscriptionDetailsClient = getSubscriptionDetailsDef.client(
-  async (input: GetSubscriptionDetailsInput): Promise<GetSubscriptionDetailsOutput> => {
-    try {
-      const { available, config } = await getPEStatus();
+async function getSubscriptionDetailsHandler(_input: GetSubscriptionDetailsInput): Promise<GetSubscriptionDetailsOutput> {
+  try {
+    const { available, config } = await getPEStatus();
 
-      // console.log('available in the getSubscriptionDetailsClient function: ', available);
-      // console.log('config in the getSubscriptionDetailsClient function: ', config);
-
-      if (!available || !config) {
-        return {
-          success: true,
-          available: false,
-          data: undefined,
-          error: 'PushEngage SDK not detected on current page',
-        };
-      }
-
-      // const summary = pushEngageService.parseCampaignSummary(config);
-      // const settings = pushEngageService.extractKeySettings(config);
-
-      const result: GetSubscriptionDetailsOutput = {
-        success: true,
-        available: true,
-        data: config,
-        // data: {
-        //   siteName: settings.siteName,
-        //   siteId: settings.siteId,
-        //   siteUrl: settings.siteUrl,
-        // },
-      };
-
-      // if (input.includeCampaigns && result.data) {
-      //   result.data.campaigns = {
-      //     browseAbandonments: summary.browseAbandonments,
-      //     cartAbandonments: summary.cartAbandonments,
-      //     customTriggers: summary.customTriggers,
-      //     activeCampaigns: summary.activeCampaigns,
-      //   };
-      // }
-
-      // if (input.includeSettings && result.data) {
-      //   result.data.settings = {
-      //     geoLocationEnabled: settings.geoLocation,
-      //     analyticsEnabled: settings.analytics,
-      //     chickletPosition: settings.chickletPosition,
-      //     chickletLabel: settings.chickletLabel,
-      //   };
-      //   result.data.segments = settings.segmentsCount;
-      //   result.data.subscriberAttributes = settings.attributesCount;
-      // }
-
-      return result;
-    } catch (error) {
+    if (!available || !config) {
       return {
-        success: false,
+        success: true,
         available: false,
-        error: error instanceof Error ? error.message : 'Failed to get subscription details',
+        data: undefined,
+        error: 'PushEngage SDK not detected on current page',
       };
     }
+
+    const result: GetSubscriptionDetailsOutput = {
+      success: true,
+      available: true,
+      // Cast config to any to handle type mismatch between PEAppConfig and schema
+      data: config as any,
+    };
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      available: false,
+      error: error instanceof Error ? error.message : 'Failed to get subscription details',
+    };
   }
-);
+}
+
+export const getSubscriptionDetailsClient = getSubscriptionDetailsDef.client(getSubscriptionDetailsHandler as any);
 
 // ============================================================
 // SCRAPE WEBSITE - Client Implementation
@@ -105,92 +86,96 @@ export const getSubscriptionDetailsClient = getSubscriptionDetailsDef.client(
  * Scrape content from a website URL.
  * Uses fetch API to retrieve page content.
  */
-export const scrapeWebsiteClient = scrapeWebsiteDef.client(
-  async (input: ScrapeWebsiteInput): Promise<ScrapeWebsiteOutput> => {
-    try {
-      // Fetch the webpage
-      const response = await fetch(input.url, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-      });
+async function scrapeWebsiteHandler(input: ScrapeWebsiteInput): Promise<ScrapeWebsiteOutput> {
+  try {
+    // Fetch the webpage
+    const response = await fetch(input.url, {
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    });
 
-      if (!response.ok) {
-        return {
-          success: false,
-          url: input.url,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-        };
-      }
-
-      const html = await response.text();
-      
-      // Parse HTML using DOMParser
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // Get title
-      const title = doc.querySelector('title')?.textContent || undefined;
-
-      // Apply selector if provided
-      const targetElement = input.selector 
-        ? doc.querySelector(input.selector) 
-        : doc.body;
-
-      if (!targetElement) {
-        return {
-          success: false,
-          url: input.url,
-          title,
-          error: `Selector "${input.selector}" not found`,
-        };
-      }
-
-      const content: ScrapeWebsiteOutput['content'] = {};
-
-      // Extract based on type
-      if (input.extractType === 'text' || input.extractType === 'all') {
-        // Get text content, clean up whitespace
-        content.text = targetElement.textContent
-          ?.replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 10000) || ''; // Limit to 10k chars
-      }
-
-      if (input.extractType === 'headings' || input.extractType === 'all') {
-        const headingElements = targetElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        content.headings = Array.from(headingElements).map(h => ({
-          level: parseInt(h.tagName[1], 10),
-          text: h.textContent?.trim() || '',
-        })).slice(0, 50); // Limit to 50 headings
-      }
-
-      if (input.extractType === 'links' || input.extractType === 'all') {
-        const linkElements = targetElement.querySelectorAll('a[href]');
-        content.links = Array.from(linkElements)
-          .map(a => ({
-            text: a.textContent?.trim() || '',
-            href: (a as HTMLAnchorElement).href,
-          }))
-          .filter(l => l.text && l.href)
-          .slice(0, 100); // Limit to 100 links
-      }
-
-      return {
-        success: true,
-        url: input.url,
-        title,
-        content,
-      };
-    } catch (error) {
+    if (!response.ok) {
       return {
         success: false,
         url: input.url,
-        error: error instanceof Error ? error.message : 'Failed to scrape website',
+        error: `HTTP ${response.status}: ${response.statusText}`,
       };
     }
+
+    const html = await response.text();
+    
+    // Parse HTML using DOMParser
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Get title
+    const title = doc.querySelector('title')?.textContent || undefined;
+
+    // Apply selector if provided
+    const targetElement = input.selector 
+      ? doc.querySelector(input.selector) 
+      : doc.body;
+
+    if (!targetElement) {
+      return {
+        success: false,
+        url: input.url,
+        title,
+        error: `Selector "${input.selector}" not found`,
+      };
+    }
+
+    const content: {
+      text?: string;
+      headings?: Array<{ level: number; text: string }>;
+      links?: Array<{ text: string; href: string }>;
+    } = {};
+
+    // Extract based on type
+    if (input.extractType === 'text' || input.extractType === 'all') {
+      // Get text content, clean up whitespace
+      content.text = targetElement.textContent
+        ?.replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 10000) || ''; // Limit to 10k chars
+    }
+
+    if (input.extractType === 'headings' || input.extractType === 'all') {
+      const headingElements = targetElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      content.headings = Array.from(headingElements).map((h: Element) => ({
+        level: parseInt(h.tagName[1], 10),
+        text: h.textContent?.trim() || '',
+      })).slice(0, 50); // Limit to 50 headings
+    }
+
+    if (input.extractType === 'links' || input.extractType === 'all') {
+      const linkElements = targetElement.querySelectorAll('a[href]');
+      content.links = Array.from(linkElements)
+        .map((a: Element) => ({
+          text: a.textContent?.trim() || '',
+          href: (a as HTMLAnchorElement).href,
+        }))
+        .filter(l => l.text && l.href)
+        .slice(0, 100); // Limit to 100 links
+    }
+
+    return {
+      success: true,
+      url: input.url,
+      title,
+      content,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      url: input.url,
+      error: error instanceof Error ? error.message : 'Failed to scrape website',
+    };
   }
-);
+}
+
+export const scrapeWebsiteClient = scrapeWebsiteDef.client(scrapeWebsiteHandler as any);
 
 // ============================================================
 // UPDATE UI - Client Implementation
@@ -218,22 +203,22 @@ export function unregisterUIUpdateCallback(): void {
 /**
  * Update the extension popup UI with a notification
  */
-export const updateUIClient = updateUIDef.client(
-  async (input: UpdateUIInput): Promise<UpdateUIOutput> => {
-    try {
-      if (uiUpdateCallback) {
-        uiUpdateCallback(input.message, input.type, input.duration || 3000);
-        return { success: true, displayed: true };
-      }
-      
-      // Fallback: log to console if no callback registered
-      console.log(`[DevDebug AI] ${input.type.toUpperCase()}: ${input.message}`);
-      return { success: true, displayed: false };
-    } catch (error) {
-      return { success: false, displayed: false };
+async function updateUIHandler(input: UpdateUIInput): Promise<UpdateUIOutput> {
+  try {
+    if (uiUpdateCallback) {
+      uiUpdateCallback(input.message, input.type, input.duration || 3000);
+      return { success: true, displayed: true };
     }
+    
+    // Fallback: log to console if no callback registered
+    console.log(`[DevDebug AI] ${input.type.toUpperCase()}: ${input.message}`);
+    return { success: true, displayed: false };
+  } catch (_error) {
+    return { success: false, displayed: false };
   }
-);
+}
+
+export const updateUIClient = updateUIDef.client(updateUIHandler as any);
 
 // ============================================================
 // SAVE TO STORAGE - Client Implementation
@@ -242,28 +227,28 @@ export const updateUIClient = updateUIDef.client(
 /**
  * Save data to Chrome storage
  */
-export const saveToStorageClient = saveToStorageDef.client(
-  async (input: SaveToStorageInput): Promise<SaveToStorageOutput> => {
-    try {
-      const storage = input.storageType === 'sync' 
-        ? chrome.storage.sync 
-        : chrome.storage.local;
+async function saveToStorageHandler(input: SaveToStorageInput): Promise<SaveToStorageOutput> {
+  try {
+    const storage = input.storageType === 'sync' 
+      ? chrome.storage.sync 
+      : chrome.storage.local;
 
-      await storage.set({ [input.key]: input.value });
+    await storage.set({ [input.key]: input.value });
 
-      return {
-        success: true,
-        key: input.key,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        key: input.key,
-        error: error instanceof Error ? error.message : 'Failed to save to storage',
-      };
-    }
+    return {
+      success: true,
+      key: input.key,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      key: input.key,
+      error: error instanceof Error ? error.message : 'Failed to save to storage',
+    };
   }
-);
+}
+
+export const saveToStorageClient = saveToStorageDef.client(saveToStorageHandler as any);
 
 // ============================================================
 // ANALYZE ERROR - Client Implementation
@@ -272,38 +257,143 @@ export const saveToStorageClient = saveToStorageDef.client(
 /**
  * Analyze a captured console error
  */
-export const analyzeErrorClient = analyzeErrorDef.client(
-  async (input: AnalyzeErrorInput): Promise<AnalyzeErrorOutput> => {
-    try {
-      const errors = await getErrors();
-      const error = errors.find(e => e.id === input.errorId);
+async function analyzeErrorHandler(input: AnalyzeErrorInput): Promise<AnalyzeErrorOutput> {
+  try {
+    const errors = await getErrors();
+    const error = errors.find(e => e.id === input.errorId);
 
-      if (!error) {
+    if (!error) {
+      return {
+        success: true,
+        notFound: true,
+      };
+    }
+
+    return {
+      success: true,
+      error: {
+        message: error.message,
+        type: error.type,
+        filename: error.filename,
+        lineno: error.lineno,
+        stack: error.stack,
+      },
+      analysis: `Error "${error.message}" occurred at ${error.filename}:${error.lineno}`,
+    };
+  } catch (_error) {
+    return {
+      success: false,
+      notFound: false,
+    };
+  }
+}
+
+export const analyzeErrorClient = analyzeErrorDef.client(analyzeErrorHandler as any);
+
+// ============================================================
+// FETCH PUSHENGAGE DOCS - Client Implementation
+// ============================================================
+
+/**
+ * Fetch PushEngage Web SDK documentation.
+ * Uses embedded documentation data for reliable results.
+ * The PushEngage docs site (https://pushengage.com/api/web-sdk/) is an SPA
+ * that cannot be scraped with simple fetch.
+ */
+async function fetchPushEngageDocsHandler(input: FetchPushEngageDocsInput): Promise<FetchPushEngageDocsOutput> {
+    try {
+      const now = Date.now();
+      const baseUrl = 'https://pushengage.com/api/web-sdk/';
+
+      // If a query is provided, search for relevant sections
+      if (input.query) {
+        const relevantMethods = searchEmbeddedDocs(input.query);
+        const formattedContent = formatDocsForAI(relevantMethods);
+
+        // Transform results into the expected output format
+        const relevantPages = relevantMethods.length > 0 ? [{
+          title: 'PushEngage Web SDK API Reference',
+          url: baseUrl,
+          sections: relevantMethods.map(method => ({
+            heading: method.name,
+            level: 2,
+            content: method.description,
+            codeExamples: method.example ? [{
+              language: 'javascript',
+              code: method.example,
+              description: `Example usage of ${method.name}`,
+            }] : undefined,
+            parameters: method.parameters?.map(p => ({
+              name: p.name,
+              type: p.type,
+              required: p.required,
+              description: p.description,
+            })),
+          })),
+          relevanceScore: 1,
+        }] : [];
+
         return {
           success: true,
-          notFound: true,
+          cached: true, // Always "cached" since we use embedded docs
+          lastUpdated: now,
+          expiresAt: now + 86400000, // 24 hours
+          totalPages: PUSHENGAGE_WEB_SDK_DOCS.length,
+          query: input.query,
+          documentation: {
+            baseUrl,
+            pages: relevantPages,
+            formattedContent: relevantMethods.length > 0 
+              ? formattedContent 
+              : `No specific documentation found for "${input.query}". Here are the available API methods:\n\n${PUSHENGAGE_WEB_SDK_DOCS.map(s => `**${s.title}:** ${s.methods.map(m => m.name).join(', ')}`).join('\n')}`,
+          },
         };
       }
 
+      // Return full documentation
+      const formattedContent = getAllDocsFormatted();
+      
       return {
         success: true,
-        error: {
-          message: error.message,
-          type: error.type,
-          filename: error.filename,
-          lineno: error.lineno,
-          stack: error.stack,
+        cached: true,
+        lastUpdated: now,
+        expiresAt: now + 86400000, // 24 hours
+        totalPages: PUSHENGAGE_WEB_SDK_DOCS.length,
+        documentation: {
+          baseUrl,
+          pages: PUSHENGAGE_WEB_SDK_DOCS.map(section => ({
+            title: section.title,
+            url: baseUrl,
+            sections: section.methods.map(method => ({
+              heading: method.name,
+              level: 2,
+              content: method.description,
+              codeExamples: method.example ? [{
+                language: 'javascript',
+                code: method.example,
+                description: `Example usage of ${method.name}`,
+              }] : undefined,
+              parameters: method.parameters?.map(p => ({
+                name: p.name,
+                type: p.type,
+                required: p.required,
+                description: p.description,
+              })),
+            })),
+          })),
+          formattedContent,
         },
-        analysis: `Error "${error.message}" occurred at ${error.filename}:${error.lineno}`,
       };
     } catch (error) {
       return {
         success: false,
-        notFound: false,
+        cached: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch PushEngage documentation',
       };
     }
-  }
-);
+}
+
+export const fetchPushEngageDocsClient = fetchPushEngageDocsDef.client(fetchPushEngageDocsHandler as any);
 
 // ============================================================
 // EXPORT ALL CLIENT TOOLS
@@ -318,6 +408,7 @@ export const clientTools = [
   updateUIClient,
   saveToStorageClient,
   analyzeErrorClient,
+  fetchPushEngageDocsClient,
 ];
 
 export {
@@ -326,5 +417,6 @@ export {
   updateUIClient as updateUI,
   saveToStorageClient as saveToStorage,
   analyzeErrorClient as analyzeError,
+  fetchPushEngageDocsClient as fetchPushEngageDocs,
 };
 

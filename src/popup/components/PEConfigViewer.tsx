@@ -69,7 +69,7 @@ export default function PEConfigViewer({ peData }: PEConfigViewerProps) {
   };
 
   // Render JSON with highlighting
-  const renderJSON = (obj: unknown, indent: number = 0): JSX.Element => {
+  const renderJSON = (obj: unknown, _indent: number = 0): JSX.Element => {
     const jsonStr = JSON.stringify(obj, null, 2);
     const lines = jsonStr.split('\n');
 
