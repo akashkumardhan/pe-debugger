@@ -8,6 +8,7 @@ export interface ConsoleError {
   lineno: number;
   timestamp: number;
   url: string;
+  tabId?: number; // ID of the tab where the error occurred
 }
 
 // Chat Message Types
@@ -44,6 +45,7 @@ export interface ChromeMessage {
   hasPushEngage?: boolean;
   url?: string;
   config?: PEAppConfig;
+  tabId?: number; // For filtering errors by tab
 }
 
 // Import PushEngage types

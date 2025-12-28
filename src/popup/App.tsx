@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bug, Megaphone, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
 import type { ConsoleError, ApiConfig, ChatMessage, PEAppConfig } from '../types';
-import { getApiConfig, getErrors, getPEStatus } from '../utils/storage';
+import { getApiConfig, getErrors, getPEStatus, getCurrentTabId } from '../utils/storage';
 import ErrorList from './components/ErrorList';
 import ChatInterface from './components/ChatInterface';
 import PushEngagePanel from './components/PushEngagePanel';
@@ -23,14 +23,19 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
+  const [currentTabId, setCurrentTabId] = useState<number | undefined>(undefined);
 
-  // Load initial data
+  // Load initial data including current tab ID
   useEffect(() => {
     async function loadData() {
       try {
+        // Get current tab ID first
+        const tabId = await getCurrentTabId();
+        setCurrentTabId(tabId);
+
         const [config, errorList, peStatus] = await Promise.all([
           getApiConfig(),
-          getErrors(),
+          getErrors(tabId), // Filter errors by current tab
           getPEStatus()
         ]);
 
@@ -53,9 +58,14 @@ export default function App() {
     loadData();
 
     // Listen for storage changes
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+    const handleStorageChange = async (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes.errors) {
-        setErrors(changes.errors.newValue || []);
+        // Re-fetch errors filtered by current tab
+        const tabId = await getCurrentTabId();
+        if (tabId !== undefined) {
+          const filteredErrors = await getErrors(tabId);
+          setErrors(filteredErrors);
+        }
       }
       if (changes.peConfig) {
         setPeData(changes.peConfig.newValue);
@@ -69,13 +79,21 @@ export default function App() {
     return () => chrome.storage.local.onChanged.removeListener(handleStorageChange);
   }, []);
 
-  // Refresh data periodically
+  // Refresh data periodically for current tab
   useEffect(() => {
     const interval = setInterval(async () => {
+      const tabId = await getCurrentTabId();
+      
+      // Update currentTabId if it changed (user switched tabs)
+      if (tabId !== currentTabId) {
+        setCurrentTabId(tabId);
+      }
+
       const [errorList, peStatus] = await Promise.all([
-        getErrors(),
+        getErrors(tabId), // Filter by current tab
         getPEStatus()
       ]);
+      
       setErrors(errorList);
       setPeAvailable(peStatus.available);
       if (peStatus.config) {
@@ -84,7 +102,7 @@ export default function App() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [currentTabId]);
 
   // Handle error analysis
   const handleAnalyzeError = useCallback((error: ConsoleError) => {
@@ -121,7 +139,7 @@ export default function App() {
     }
   }, []);
 
-  // Handle errors update
+  // Handle errors update (for clearing)
   const handleErrorsUpdate = useCallback((newErrors: ConsoleError[]) => {
     setErrors(newErrors);
   }, []);
@@ -157,6 +175,7 @@ export default function App() {
             errors={errors}
             onAnalyze={handleAnalyzeError}
             onUpdate={handleErrorsUpdate}
+            currentTabId={currentTabId}
           />
         );
       case 'pushengage':
@@ -258,4 +277,3 @@ export default function App() {
     </div>
   );
 }
-

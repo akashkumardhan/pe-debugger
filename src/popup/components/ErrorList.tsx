@@ -8,11 +8,12 @@ interface ErrorListProps {
   errors: ConsoleError[];
   onAnalyze: (error: ConsoleError) => void;
   onUpdate: (errors: ConsoleError[]) => void;
+  currentTabId?: number; // Current tab ID for filtering
 }
 
 type FilterType = 'all' | 'error' | 'warning';
 
-export default function ErrorList({ errors, onAnalyze, onUpdate }: ErrorListProps) {
+export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }: ErrorListProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
 
@@ -38,10 +39,10 @@ export default function ErrorList({ errors, onAnalyze, onUpdate }: ErrorListProp
   const errorCount = errors.filter(e => e.type === 'error').length;
   const warningCount = errors.filter(e => e.type === 'warning').length;
 
-  // Handle clear all
+  // Handle clear all - only clears errors for current tab
   const handleClearAll = async () => {
-    if (confirm('Are you sure you want to clear all errors?')) {
-      await clearErrors();
+    if (confirm('Are you sure you want to clear all errors for this tab?')) {
+      await clearErrors(currentTabId);
       onUpdate([]);
     }
   };
@@ -124,12 +125,12 @@ export default function ErrorList({ errors, onAnalyze, onUpdate }: ErrorListProp
               )}
             </div>
             <h3 className="text-sm font-medium text-gray-700 mb-1">
-              {search || filter !== 'all' ? 'No matching errors' : 'No errors captured'}
+              {search || filter !== 'all' ? 'No matching errors' : 'No errors on this tab'}
             </h3>
             <p className="text-xs text-gray-500">
               {search || filter !== 'all'
                 ? 'Try adjusting your search or filters'
-                : 'Console errors will appear here in real-time'}
+                : 'Console errors from the current tab will appear here'}
             </p>
           </div>
         ) : (
@@ -145,4 +146,3 @@ export default function ErrorList({ errors, onAnalyze, onUpdate }: ErrorListProp
     </div>
   );
 }
-

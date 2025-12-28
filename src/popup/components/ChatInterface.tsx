@@ -4,6 +4,7 @@
  * Dual-mode AI chat interface for:
  * - Debug Mode: Analyze console errors with AI assistance
  * - PushEngage Mode: Query PE configuration in natural language
+ * - Generic Mode: General developer assistance when no specific context
  * 
  * Uses useAIChat hook which mimics @tanstack/ai-client API pattern
  */
@@ -126,8 +127,8 @@ export default function ChatInterface({
     );
   }
 
-  // Check if we have the required context for the current mode
-  const hasRequiredContext = mode === 'debug' ? selectedError : peData;
+  // Check if we have specific context for the current mode
+  const hasSpecificContext = mode === 'debug' ? selectedError : peData;
 
   // Toast icon based on type
   const getToastIcon = (type: Toast['type']) => {
@@ -210,15 +211,25 @@ export default function ChatInterface({
             </div>
           </div>
         ) : (
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <div className="flex items-center gap-2 text-gray-500">
-              <AlertCircle size={16} />
-              <p className="text-xs">
-                {mode === 'debug'
-                  ? 'Select an error from the Errors tab to analyze'
-                  : 'PushEngage data not available. Make sure the page has PE SDK loaded.'}
-              </p>
+          // Generic mode - no specific context but still usable
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                💬 General Assistant
+              </span>
+              <button
+                onClick={onModeSwitch}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+              >
+                <ArrowLeftRight size={12} />
+                Switch Mode
+              </button>
             </div>
+            <p className="text-xs text-blue-600 mt-1">
+              {mode === 'debug'
+                ? 'No error selected. Ask general questions or select an error from the Errors tab.'
+                : 'PushEngage not detected. Ask general questions or visit a page with PE SDK.'}
+            </p>
           </div>
         )}
       </div>
@@ -229,24 +240,33 @@ export default function ChatInterface({
           <div className="text-center py-8">
             <Bot size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-sm text-gray-500 mb-2">
-              {mode === 'debug'
-                ? 'Ask questions about the error or request debugging help'
-                : 'Ask questions about your PushEngage configuration'}
+              {hasSpecificContext
+                ? mode === 'debug'
+                  ? 'Ask questions about the error or request debugging help'
+                  : 'Ask questions about your PushEngage configuration'
+                : 'Ask me anything about web development, debugging, or PushEngage!'}
             </p>
             {/* Show example queries */}
             <div className="mt-4 space-y-2">
               <p className="text-xs text-gray-400">Try asking:</p>
-              {mode === 'debug' ? (
+              {mode === 'debug' && selectedError ? (
                 <div className="flex flex-wrap gap-2 justify-center">
                   <ExampleChip text="What's causing this error?" onClick={() => setInput("What's causing this error?")} />
                   <ExampleChip text="How do I fix this?" onClick={() => setInput("How do I fix this error?")} />
                   <ExampleChip text="Show me a code example" onClick={() => setInput("Show me a code example to fix this")} />
                 </div>
-              ) : (
+              ) : mode === 'pushengage' && peData ? (
                 <div className="flex flex-wrap gap-2 justify-center">
                   <ExampleChip text="List all campaigns" onClick={() => setInput("Show me all active campaigns")} />
                   <ExampleChip text="Cart abandonment settings" onClick={() => setInput("What are my cart abandonment settings?")} />
                   <ExampleChip text="Opt-in configuration" onClick={() => setInput("Explain my opt-in configuration")} />
+                </div>
+              ) : (
+                // Generic examples when no specific context
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <ExampleChip text="How does async/await work?" onClick={() => setInput("How does async/await work in JavaScript?")} />
+                  <ExampleChip text="Explain push notifications" onClick={() => setInput("How do web push notifications work?")} />
+                  <ExampleChip text="Debug CORS errors" onClick={() => setInput("How do I debug CORS errors?")} />
                 </div>
               )}
             </div>
@@ -352,20 +372,18 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              !hasRequiredContext
+              hasSpecificContext
                 ? mode === 'debug'
-                  ? 'Select an error to analyze...'
-                  : 'Waiting for PE data...'
-                : mode === 'debug'
-                ? 'Ask about this error...'
-                : 'Ask about PushEngage config...'
+                  ? 'Ask about this error...'
+                  : 'Ask about PushEngage config...'
+                : 'Ask me anything...'
             }
             className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-gray-50"
-            disabled={isLoading || !hasRequiredContext}
+            disabled={isLoading}
           />
           <button
             type="submit"
-            disabled={isLoading || !input.trim() || !hasRequiredContext}
+            disabled={isLoading || !input.trim()}
             className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             <Send size={18} />

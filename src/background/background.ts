@@ -21,13 +21,14 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('DevDebug AI installed');
 });
 
-// Handle messages from content scripts
+// Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id;
 
   switch (message.type) {
     case 'CONSOLE_ERROR':
-      handleConsoleError(message.error);
+      // Pass tabId from sender when storing errors
+      handleConsoleError(message.error, tabId);
       break;
 
     case 'PE_DETECTION':
@@ -39,11 +40,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'GET_ERRORS':
-      getErrors().then(sendResponse);
+      // Support filtering by tabId
+      getErrors(message.tabId).then(sendResponse);
       return true;
 
     case 'CLEAR_ERRORS':
-      clearErrors().then(() => sendResponse({ success: true }));
+      // Support clearing by tabId
+      clearErrors(message.tabId).then(() => sendResponse({ success: true }));
       return true;
 
     case 'GET_PE_CONFIG':
@@ -51,7 +54,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'GET_PE_STATUS':
-      getPEStatus(tabId).then(sendResponse);
+      getPEStatus(message.tabId || tabId).then(sendResponse);
       return true;
 
     case 'CLEAR_PE_CONFIG':
@@ -62,8 +65,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Handle console errors
-async function handleConsoleError(error: ConsoleError): Promise<void> {
+// Handle console errors - now includes tabId
+async function handleConsoleError(error: ConsoleError, tabId?: number): Promise<void> {
   if (!error) return;
 
   try {
@@ -77,12 +80,21 @@ async function handleConsoleError(error: ConsoleError): Promise<void> {
     );
 
     if (!isDuplicate) {
+      // Add tabId to the error
+      const errorWithTab: ConsoleError = {
+        ...error,
+        tabId: tabId
+      };
+
       // Add new error and maintain max limit (FIFO)
-      const updatedErrors = [...errors, error].slice(-MAX_ERRORS);
+      const updatedErrors = [...errors, errorWithTab].slice(-MAX_ERRORS);
       await chrome.storage.local.set({ errors: updatedErrors });
 
-      // Update badge
-      updateBadge(updatedErrors.length);
+      // Update badge for the specific tab
+      if (tabId) {
+        const tabErrors = updatedErrors.filter(e => e.tabId === tabId);
+        updateBadge(tabErrors.length, tabId);
+      }
     }
   } catch (err) {
     console.error('DevDebug: Failed to store error:', err);
@@ -122,21 +134,36 @@ async function handlePEConfig(config: PEAppConfig, tabId?: number): Promise<void
   }
 }
 
-// Get all stored errors
-async function getErrors(): Promise<ConsoleError[]> {
+// Get errors - optionally filtered by tabId
+async function getErrors(tabId?: number): Promise<ConsoleError[]> {
   try {
     const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
+    
+    // If tabId is provided, filter errors for that tab
+    if (tabId !== undefined) {
+      return errors.filter(e => e.tabId === tabId);
+    }
+    
     return errors;
   } catch {
     return [];
   }
 }
 
-// Clear all errors
-async function clearErrors(): Promise<void> {
+// Clear errors - optionally filtered by tabId
+async function clearErrors(tabId?: number): Promise<void> {
   try {
-    await chrome.storage.local.set({ errors: [] });
-    updateBadge(0);
+    if (tabId !== undefined) {
+      // Clear only errors for the specific tab
+      const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
+      const filteredErrors = errors.filter(e => e.tabId !== tabId);
+      await chrome.storage.local.set({ errors: filteredErrors });
+      updateBadge(0, tabId);
+    } else {
+      // Clear all errors
+      await chrome.storage.local.set({ errors: [] });
+      updateBadge(0);
+    }
   } catch (err) {
     console.error('DevDebug: Failed to clear errors:', err);
   }
@@ -155,11 +182,16 @@ async function getPEConfig(): Promise<PEAppConfig | null> {
 // Get PE status for current tab
 async function getPEStatus(tabId?: number): Promise<{ available: boolean; config: PEAppConfig | null }> {
   try {
-    const { peAvailable = false, peConfig = null } = await chrome.storage.local.get(['peAvailable', 'peConfig']) as {
+    const { peAvailable = false, peConfig = null, peTabUrls = {} } = await chrome.storage.local.get(['peAvailable', 'peConfig', 'peTabUrls']) as {
       peAvailable: boolean;
       peConfig: PEAppConfig | null;
+      peTabUrls: Record<number, boolean>;
     };
-    return { available: peAvailable, config: peConfig };
+    
+    // If tabId provided, check PE availability for that specific tab
+    const isAvailable = tabId ? (peTabUrls[tabId] || false) : peAvailable;
+    
+    return { available: isAvailable, config: peConfig };
   } catch {
     return { available: false, config: null };
   }
@@ -174,25 +206,48 @@ async function clearPEConfig(): Promise<void> {
   }
 }
 
-// Update extension badge
-function updateBadge(count: number): void {
+// Update extension badge - optionally for a specific tab
+function updateBadge(count: number, tabId?: number): void {
   const text = count > 0 ? count.toString() : '';
   const color = count > 0 ? '#EF4444' : '#3B82F6';
 
-  chrome.action.setBadgeText({ text });
-  chrome.action.setBadgeBackgroundColor({ color });
+  if (tabId) {
+    chrome.action.setBadgeText({ text, tabId });
+    chrome.action.setBadgeBackgroundColor({ color, tabId });
+  } else {
+    chrome.action.setBadgeText({ text });
+    chrome.action.setBadgeBackgroundColor({ color });
+  }
 }
 
 // Clean up when tab is closed
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   try {
+    // Clean up PE tab tracking
     const { peTabUrls = {} } = await chrome.storage.local.get('peTabUrls') as { peTabUrls: Record<number, boolean> };
     delete peTabUrls[tabId];
     await chrome.storage.local.set({ peTabUrls });
+    
+    // Optionally: Clean up errors for closed tab
+    const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
+    const filteredErrors = errors.filter(e => e.tabId !== tabId);
+    if (filteredErrors.length !== errors.length) {
+      await chrome.storage.local.set({ errors: filteredErrors });
+    }
   } catch {
     // Ignore cleanup errors
   }
 });
 
-console.log('DevDebug AI background service worker started');
+// Update badge when tab is activated
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
+    const tabErrors = errors.filter(e => e.tabId === activeInfo.tabId);
+    updateBadge(tabErrors.length, activeInfo.tabId);
+  } catch {
+    // Ignore errors
+  }
+});
 
+console.log('DevDebug AI background service worker started');

@@ -22,17 +22,37 @@ export async function clearApiConfig(): Promise<void> {
 
 // ===== ERROR MANAGEMENT =====
 
-export async function getErrors(): Promise<ConsoleError[]> {
+/**
+ * Get errors, optionally filtered by tab ID
+ * @param tabId - If provided, only returns errors from that specific tab
+ */
+export async function getErrors(tabId?: number): Promise<ConsoleError[]> {
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_ERRORS' });
+    const response = await chrome.runtime.sendMessage({ type: 'GET_ERRORS', tabId });
     return response || [];
   } catch {
     return [];
   }
 }
 
-export async function clearErrors(): Promise<void> {
-  await chrome.runtime.sendMessage({ type: 'CLEAR_ERRORS' });
+/**
+ * Clear errors, optionally only for a specific tab
+ * @param tabId - If provided, only clears errors from that specific tab
+ */
+export async function clearErrors(tabId?: number): Promise<void> {
+  await chrome.runtime.sendMessage({ type: 'CLEAR_ERRORS', tabId });
+}
+
+/**
+ * Get the current active tab ID
+ */
+export async function getCurrentTabId(): Promise<number | undefined> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tab?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 export function exportErrorsAsJSON(errors: ConsoleError[]): void {
