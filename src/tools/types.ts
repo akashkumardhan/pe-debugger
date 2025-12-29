@@ -153,7 +153,7 @@ export const OptinFullSchema = OptinBaseSchema.extend({
   checkbox_bg: z.string().describe('Checkbox background color'),
   checkbox_tick_color: z.string().describe('Checkbox tick color'),
   default_segment_selection: z.boolean().describe('Default segment selection'),
-}).describe('Full opt-in configuration');
+}).describe('Full opt-in or popup modal configuration');
 
 export const OptinsSchema = z.record(
   z.string().describe('Opt-in type key'),
@@ -167,7 +167,7 @@ export const OptinsSchema = z.record(
           })
         )
         .optional(),
-    }).describe('Desktop opt-in settings'),
+    }).describe('Desktop opt-in or popup modal settings'),
 
     mobile: z.object({
       http: OptinFullSchema.optional(),
@@ -178,38 +178,62 @@ export const OptinsSchema = z.record(
           })
         )
         .optional(),
-    }).describe('Mobile opt-in settings'),
+    }).describe('Mobile opt-in or popup modal settings'),
   })
-).describe('All opt-in configurations');
+).describe('All opt-in or popup modal configurations');
 
 // ============================================================
 // SITE SETTINGS SCHEMA
 // ============================================================
 
 export const SiteSettingsSchema = z.object({
+  // Subscriber Recovery Widgets
   chicklet_settings: z.object({
     settings: z.object({
-      delay: z.number().describe('Delay in seconds before chicklet appears'),
-    }).describe('General chicklet behavior settings'),
+      delay: z.number().describe('Delay in seconds before recovery button widget appears'),
+    }).describe('General recovery button widget behavior settings'),
 
     bell: z.object({
-      bg: z.string().describe('Bell background color'),
-      color: z.string().describe('Bell icon color'),
-      position: z.string().describe('Bell position on screen'),
-      label: z.string().describe('Bell label text'),
-    }).describe('Bell UI configuration'),
-  }).describe('Chicklet UI settings'),
+      bg: z.string().describe('Bell widget background color'),
+      color: z.string().describe('Bell widget icon color'),
+      position: z.string().describe('Bell widget position on screen'),
+      label: z.string().describe('Bell widget label text'),
+    }).describe('A bell widget that can be repositioned and customized to provide a second chance to subscribe for push notification permission'),
+  }).describe('Subscriber Recovery Widgets, Give your visitors another chance to subscribe to your push notifications even if they block your popup modal'),
 
+  // GCM settings
   gcm_options: z.object({
     project_id: z.string().describe('Firebase / GCM project ID'),
   }).describe('Google Cloud Messaging configuration'),
 
+  // Targeting Rule
   optin_management_settings: z.object({
+    include: z
+    .array(
+      z.object({
+        id: z
+          .number()
+          .describe('Unique identifier for the targeting rule'),
+
+        rule: z
+          .enum(['start', 'contains', 'exact'])
+          .describe('Rule type for URL matching'),
+
+        value: z
+          .string()
+          .describe('Value used for URL matching'),
+      })
+    )
+    .describe(
+      'URL-based include rules that determine where the opt-in should be shown'
+    ),
     include_countries: z
       .array(z.string())
       .describe('Countries where opt-in is enabled'),
-  }).describe('Opt-in geo management settings'),
+  }).describe('Targeting Rule, By default, the subscription opt-in will be shown across all pages. Setup the global targeting rule for your opt-ins here. The global targeting rules will have a higher preference over the individual opt-in subscription rule'),
 
+
+  // Opt-in settings
   optin_settings: z.object({
     intermediate: z.object({
       bg: z.string().describe('Intermediate screen background color'),
@@ -227,10 +251,10 @@ export const SiteSettingsSchema = z.object({
       https: z.object({
         types: z.array(z.number()).describe('HTTPS opt-in types'),
       }).describe('HTTPS active opt-ins'),
-    }).describe('Active opt-in configuration'),
+    }).describe('List of all active opt-in configuration'),
 
     optins: OptinsSchema,
-  }).describe('All opt-in related configuration'),
+  }).describe('All opt-in or popup modal related configuration'),
 
   privacy_settings: z.object({
     geoLocationEnabled: z
@@ -238,19 +262,24 @@ export const SiteSettingsSchema = z.object({
       .describe('Whether geo-location tracking is enabled'),
   }).describe('Privacy settings'),
 
+
+  // Service worker configuration
   service_worker: z.object({
-    scope: z.boolean().describe('Service worker scope enabled'),
-    workerStatus: z.boolean().describe('Service worker active status'),
-    worker: z.string().describe('Service worker script URL'),
+    scope: z.boolean().describe('Enable addition of service worker in another sub-folder if its value is true otherwise it will be in the root folder'),
+    workerStatus: z.boolean().describe('Enable the service worker registration from PushEngage'),
+    worker: z.string().describe('Path for service worker file'),
     keepMultipleSubscriptions: z
       .boolean()
       .describe('Allow multiple subscriptions per user'),
-  }).describe('Service worker configuration'),
+  }).describe('Service worker configuration, The service worker is a key file in sending and collecting subscriptions.'),
 
+  // Opt-in Analytics
   sub_analytics: z.object({
-    enabled: z.boolean().describe('Whether subscription analytics is enabled'),
-  }).describe('Subscription analytics settings'),
+    enabled: z.boolean().describe('Whether Opt-in analytics is enabled'),
+  }).describe('Opt-in Analytics settings'),
 
+
+  // Unsubscribe Button Widget
   sub_management_settings: z.object({
     button: z.object({
       position: z.string().describe('Button position on screen'),
@@ -261,13 +290,15 @@ export const SiteSettingsSchema = z.object({
       confirmMsg: z.string().describe('Confirmation message'),
       ConfirmActionYes: z.string().describe('Confirm yes button text'),
       ConfirmActionNo: z.string().describe('Confirm no button text'),
-    }).describe('Subscription management button'),
+    }).describe('Unsubscribe Button Widget button'),
 
     settings: z.object({
-      rules: z.record(z.string(), z.any()).describe('Subscription management rules'),
-    }).describe('Subscription management rules'),
-  }).describe('Subscription management settings'),
+      rules: z.record(z.string(), z.any()).describe('Unsubscribe Button Widget rules'),
+    }).describe('Unsubscribe Button Widget rules'),
+  }).describe('Unsubscribe Button Widget Settings, Give your subscribers an easy way to unsubscribe from your push notifications. '),
 
+
+  // Subscription Management Widget
   subscription_management_widget: z.object({
     enabled: z.boolean().describe('Widget enabled status'),
     title: z.string().describe('Widget title'),
@@ -289,7 +320,7 @@ export const SiteSettingsSchema = z.object({
       icon_type: z.string().describe('Icon type'),
       z_index: z.number().describe('Z-index value'),
       rules: TriggerRulesSchema,
-    }).describe('Trigger button configuration'),
+    }).describe('Trigger button configuration, The widget is displayed when the user clicks on the trigger button.'),
 
     segment_preference: z.object({
       enabled: z.boolean().describe('Segment preference enabled'),
@@ -311,7 +342,7 @@ export const SiteSettingsSchema = z.object({
       default_segment_selection: z
         .boolean()
         .describe('Default segment selection'),
-    }).describe('Segment preference settings'),
+    }).describe('Segment preference settings, Give users the option to manage the segments they are subscribed to before or after subscription'),
 
     unsubscribe_options: z.object({
       enabled: z.boolean().describe('Unsubscribe dialog enabled'),
@@ -332,16 +363,17 @@ export const SiteSettingsSchema = z.object({
       cancel_button_text_color: z
         .string()
         .describe('Cancel button text color'),
-    }).describe('Unsubscribe confirmation options'),
+    }).describe('Unsubscribe confirmation options, This setting allows the user to unsubscribe from notifications.'),
 
     personal_notification_options: z.object({
       enabled: z
         .boolean()
         .describe('Personal notification options enabled'),
       label: z.string().describe('Personal notification label'),
-    }).describe('Personal notification settings'),
-  }).describe('Subscription management widget'),
+    }).describe('Personalized Notification settings, This setting allows users to disable or re-enable triggered campaign notifications.'),
+  }).describe('Subscription Management Widget,This widget provides an easy option for your users to manage push permissions. They can also opt in and opt out of the segments'),
 
+  // Web Push VAPID keys
   vapid_key: z.object({
     public_key: z.string().describe('VAPID public key'),
   }).describe('Web Push VAPID keys'),
