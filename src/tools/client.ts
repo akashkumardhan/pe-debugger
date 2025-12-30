@@ -12,12 +12,15 @@
 
 import {
   getAppConfigDef,
+  getSubscriberDetailsDef,
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,
   fetchPushEngageDocsDef,
   type GetAppConfigInput,
   type GetAppConfigOutput,
+  type GetSubscriberDetailsInput,
+  type GetSubscriberDetailsOutput,
   type UpdateUIInput,
   type UpdateUIOutput,
   type SaveToStorageInput,
@@ -27,7 +30,7 @@ import {
   type FetchPushEngageDocsInput,
   type FetchPushEngageDocsOutput,
 } from './definitions';
-import { getPEStatus, getErrors } from '../utils/storage';
+import { getPEStatus, getPESubscriberDetails, getErrors } from '../utils/storage';
 import { 
   searchDocumentation, 
   formatSectionsForAI, 
@@ -75,6 +78,45 @@ async function getAppConfigHandler(_input: GetAppConfigInput): Promise<GetAppCon
 }
 
 export const getAppConfigClient = getAppConfigDef.client(getAppConfigHandler as any);
+
+// ============================================================
+// GET SUBSCRIPTION DETAILS - Client Implementation
+// ============================================================
+
+/**
+ * Get PushEngage subscriber details from localStorage.PushEngageSDK
+ */
+async function getSubscriberDetailsHandler(_input: GetSubscriberDetailsInput): Promise<GetSubscriberDetailsOutput> {
+  try {
+    const { available, data } = await getPESubscriberDetails();
+
+    if (!available || !data) {
+      return {
+        success: true,
+        available: false,
+        data: undefined,
+        error: 'PushEngage subscriber details not found in localStorage',
+      };
+    }
+
+    const result: GetSubscriberDetailsOutput = {
+      success: true,
+      available: true,
+      // Cast data to any to handle type mismatch between PESubscriberDetails and schema
+      data: data as any,
+    };
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      available: false,
+      error: error instanceof Error ? error.message : 'Failed to get subscriber details',
+    };
+  }
+}
+
+export const getSubscriberDetailsClient = getSubscriberDetailsDef.client(getSubscriberDetailsHandler as any);
 
 // ============================================================
 // UPDATE UI - Client Implementation
@@ -308,6 +350,7 @@ export const fetchPushEngageDocsClient = fetchPushEngageDocsDef.client(fetchPush
  */
 export const clientTools = [
   getAppConfigClient,
+  getSubscriberDetailsClient,
   updateUIClient,
   saveToStorageClient,
   analyzeErrorClient,
@@ -316,6 +359,7 @@ export const clientTools = [
 
 export {
   getAppConfigClient as getAppConfig,
+  getSubscriberDetailsClient as getSubscriberDetails,
   updateUIClient as updateUI,
   saveToStorageClient as saveToStorage,
   analyzeErrorClient as analyzeError,

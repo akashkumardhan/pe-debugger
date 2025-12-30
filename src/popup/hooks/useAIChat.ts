@@ -44,7 +44,8 @@ function buildSystemPrompt(
 ): string {
   const toolsDescription = `
 You have access to the following tools:
-- get_subscription_app_config: Get PushEngage subscription app configuration details from the current page
+- get_subscription_app_config: Get PushEngage subscription app configuration details from the current page (campaigns, site settings, segments, opt-in configuration)
+- get_subscription_details: Get PushEngage subscription details from the current page, including isSubDomain, appId, subscriber id, isSubscribed, endpoint, and subscriber details like expiresAt, city, country, device, browser type, subscription URL, timezone, segments, and trigger status
 - fetch_pushengage_docs: Search PushEngage Web SDK documentation for API methods, code examples, and usage guides
 - update_ui: Display notifications in the extension popup
 - save_to_storage: Save data to browser storage
@@ -53,6 +54,7 @@ You have access to the following tools:
 IMPORTANT TOOL USAGE GUIDELINES:
 - When users ask about PushEngage JavaScript API, SDK methods, code examples, or "how to" questions → Use "fetch_pushengage_docs" tool with a relevant query
 - When users ask about their specific PushEngage configuration, campaigns, settings → Use "get_subscription_app_config" tool
+- When users ask about their subscription status, subscriber ID, device info, location, or subscription metadata → Use "get_subscription_details" tool
 - Use tools proactively when they can help answer the question
 - When returning code examples from fetch_pushengage_docs, copy the EXACT code from the documentation - do NOT modify or rewrite it
 `;

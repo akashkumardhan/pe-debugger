@@ -1,5 +1,5 @@
 // Chrome Storage Utilities
-import type { ConsoleError, ApiConfig, PEAppConfig } from '../types';
+import type { ConsoleError, ApiConfig, PEAppConfig, PESubscriberDetails } from '../types';
 import type { DocCache } from '../tools/types';
 
 // ===== CONSTANTS =====
@@ -120,6 +120,35 @@ export function exportPEConfigAsJSON(config: PEAppConfig): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `pushengage-config-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ===== PUSHENGAGE SUBSCRIBER DETAILS =====
+
+export async function getPESubscriberDetails(): Promise<{ available: boolean; data: PESubscriberDetails | null }> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_PE_SUBSCRIBER' });
+    return response || { available: false, data: null };
+  } catch {
+    return { available: false, data: null };
+  }
+}
+
+export async function clearPESubscriberDetails(): Promise<void> {
+  await chrome.storage.local.set({ peSubscriberDetails: null, peSubscriberAvailable: false });
+}
+
+export function exportPESubscriberDetailsAsJSON(data: PESubscriberDetails): void {
+  const dataStr = JSON.stringify(data, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pushengage-subscriber-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

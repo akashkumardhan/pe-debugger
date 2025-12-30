@@ -25,6 +25,18 @@ interface PEConfig {
   subscriberAttributes?: unknown[];
 }
 
+interface PESubscriberDetails {
+  isSubDomain?: boolean;
+  appId?: string;
+  id?: string;
+  isSubscribed?: boolean;
+  endpoint?: string;
+  subscriber?: {
+    expiresAt?: number;
+    data?: unknown;
+  };
+}
+
 (function() {
   'use strict';
 
@@ -155,6 +167,9 @@ interface PEConfig {
       url: window.location.href
     }, '*');
 
+    // Always try to read subscriber details from localStorage (may exist even if SDK not loaded)
+    readSubscriberDetails();
+
     if (hasPushEngage) {
       try {
         const pe = (window as unknown as { PushEngage: { getAppConfig: () => unknown } }).PushEngage;
@@ -182,6 +197,43 @@ interface PEConfig {
       type: 'PE_CONFIG',
       config
     }, '*');
+  }
+
+  // ===== SUBSCRIBER DETAILS FROM LOCALSTORAGE =====
+  function readSubscriberDetails(): void {
+    try {
+      const rawData = localStorage.getItem('PushEngageSDK');
+      
+      if (!rawData) {
+        // No subscriber data in localStorage
+        window.postMessage({
+          source: 'devdebug-ai',
+          type: 'PE_SUBSCRIBER_DETAILS',
+          available: false,
+          data: null
+        }, '*');
+        return;
+      }
+
+      const subscriberDetails = JSON.parse(rawData) as PESubscriberDetails;
+      
+      // Send subscriber details to extension
+      window.postMessage({
+        source: 'devdebug-ai',
+        type: 'PE_SUBSCRIBER_DETAILS',
+        available: true,
+        data: subscriberDetails
+      }, '*');
+    } catch (err) {
+      // JSON parsing failed or other error
+      console.warn('DevDebug: Failed to read PushEngageSDK from localStorage:', err);
+      window.postMessage({
+        source: 'devdebug-ai',
+        type: 'PE_SUBSCRIBER_DETAILS',
+        available: false,
+        data: null
+      }, '*');
+    }
   }
 
   // Initial detection after a short delay (to allow PE SDK to load)

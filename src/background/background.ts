@@ -1,12 +1,17 @@
 // DevDebug AI - Background Service Worker
 import type { ConsoleError, PEAppConfig } from '../types';
 
+// Import subscriber details type
+import type { SubscriberDetails } from '../tools/types';
+
 // Storage data interface for reference (used implicitly via chrome.storage)
 export type StorageData = {
   errors: ConsoleError[];
   peConfig: PEAppConfig | null;
   peAvailable: boolean;
   peTabUrls: Record<number, boolean>;
+  peSubscriberDetails: SubscriberDetails | null;
+  peSubscriberAvailable: boolean;
 };
 
 const MAX_ERRORS = 50;
@@ -17,7 +22,9 @@ chrome.runtime.onInstalled.addListener(() => {
     errors: [],
     peConfig: null,
     peAvailable: false,
-    peTabUrls: {}
+    peTabUrls: {},
+    peSubscriberDetails: null,
+    peSubscriberAvailable: false
   });
   console.log('DevDebug AI installed');
 });
@@ -39,6 +46,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'PE_CONFIG':
       handlePEConfig(message.config, tabId);
       break;
+
+    case 'PE_SUBSCRIBER_DETAILS':
+      handlePESubscriberDetails(message.subscriberDetails, message.available, tabId);
+      break;
+
+    case 'GET_PE_SUBSCRIBER':
+      getPESubscriberDetails(message.tabId || tabId).then(sendResponse);
+      return true;
 
     case 'GET_ERRORS':
       // Support filtering by tabId
@@ -139,6 +154,22 @@ async function handlePEConfig(config: PEAppConfig, _tabId?: number): Promise<voi
   }
 }
 
+// Handle PushEngage subscriber details from localStorage
+async function handlePESubscriberDetails(
+  subscriberDetails: SubscriberDetails | null,
+  available: boolean,
+  _tabId?: number
+): Promise<void> {
+  try {
+    await chrome.storage.local.set({
+      peSubscriberDetails: subscriberDetails,
+      peSubscriberAvailable: available
+    });
+  } catch (err) {
+    console.error('DevDebug: Failed to store PE subscriber details:', err);
+  }
+}
+
 // Get errors - optionally filtered by tabId
 async function getErrors(tabId?: number): Promise<ConsoleError[]> {
   try {
@@ -199,6 +230,20 @@ async function getPEStatus(tabId?: number): Promise<{ available: boolean; config
     return { available: isAvailable, config: peConfig };
   } catch {
     return { available: false, config: null };
+  }
+}
+
+// Get PE subscriber details from localStorage
+async function getPESubscriberDetails(_tabId?: number): Promise<{ available: boolean; data: SubscriberDetails | null }> {
+  try {
+    const { peSubscriberDetails = null, peSubscriberAvailable = false } = await chrome.storage.local.get(['peSubscriberDetails', 'peSubscriberAvailable']) as {
+      peSubscriberDetails: SubscriberDetails | null;
+      peSubscriberAvailable: boolean;
+    };
+    
+    return { available: peSubscriberAvailable, data: peSubscriberDetails };
+  } catch {
+    return { available: false, data: null };
   }
 }
 

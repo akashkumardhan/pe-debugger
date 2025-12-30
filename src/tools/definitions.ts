@@ -16,6 +16,7 @@ import {
   SegmentSchema,
   SiteSchema,
   SiteSettingsSchema,
+  SubscriberDetailsSchema,
 } from './types';
 
 // ============================================================
@@ -63,12 +64,12 @@ const getAppConfigOutputSchema = z.object({
 
     segments: z
       .array(SegmentSchema)
-      .describe('Audience segmentation rules'),
+      .describe('PushEngage segments details for this site.PushEngage segments allow marketers to group website visitors and subscribers based on behavior, demographics, and interests for personalized push notifications'),
 
-    site: SiteSchema.describe('Site metadata'),
+    site: SiteSchema.describe('PushEngage site details for this site'),
 
     siteSettings: SiteSettingsSchema.describe(
-      'Complete site configuration and UI settings'
+      'Complete PushEngage site configuration and UI settings for this site'
     ),
 
     subscriberAttributes: z
@@ -94,6 +95,40 @@ export const getAppConfigDef = toolDefinition({
 
 export type GetAppConfigInput = z.infer<typeof getAppConfigInputSchema>;
 export type GetAppConfigOutput = z.infer<typeof getAppConfigOutputSchema>;
+
+// ============================================================
+// GET SUBSCRIPTION DETAILS TOOL
+// ============================================================
+
+const getSubscriberDetailsInputSchema = z.object({
+  includeMetadata: z.boolean()
+    .optional()
+    .default(true)
+    .describe('Whether to include full subscriber metadata in the response'),
+});
+
+const getSubscriberDetailsOutputSchema = z.object({
+  success: z.boolean(),
+  available: z.boolean().describe('Whether subscriber details are available in localStorage'),
+  data: SubscriberDetailsSchema
+    .optional()
+    .describe('Complete subscriber details from localStorage.PushEngageSDK'),
+  error: z.string().optional(),
+});
+
+/**
+ * Get PushEngage subscription details from the current page's localStorage.
+ * Reads from localStorage.PushEngageSDK key.
+ */
+export const getSubscriberDetailsDef = toolDefinition({
+  name: 'get_subscription_details',
+  description: 'Get PushEngage subscription details from the current page, including isSubDomain, appId, subscriber id, isSubscribed, endpoint, and subscriber details like expiresAt, city, country, device, browser type, subscription URL, timezone, segments, and trigger status.',
+  inputSchema: getSubscriberDetailsInputSchema,
+  outputSchema: getSubscriberDetailsOutputSchema,
+});
+
+export type GetSubscriberDetailsInput = z.infer<typeof getSubscriberDetailsInputSchema>;
+export type GetSubscriberDetailsOutput = z.infer<typeof getSubscriberDetailsOutputSchema>;
 
 // ============================================================
 // UPDATE UI TOOL
@@ -318,6 +353,7 @@ export type FetchPushEngageDocsOutput = z.infer<typeof fetchPushEngageDocsOutput
 
 export const allToolDefinitions = [
   getAppConfigDef,
+  getSubscriberDetailsDef,
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,
@@ -332,6 +368,7 @@ export {
   SegmentSchema,
   SiteSchema,
   SiteSettingsSchema,
+  SubscriberDetailsSchema,
 } from './types';
 
 // Re-export documentation schemas

@@ -45,15 +45,20 @@ export interface AppState {
 
 // Message Types for Chrome Runtime
 export interface ChromeMessage {
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'GET_ERRORS' | 'CLEAR_ERRORS' | 'GET_PE_CONFIG' | 'GET_PE_STATUS';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'GET_ERRORS' | 'CLEAR_ERRORS' | 'GET_PE_CONFIG' | 'GET_PE_STATUS' | 'GET_PE_SUBSCRIBER';
   error?: ConsoleError;
   hasPushEngage?: boolean;
   url?: string;
   config?: PEAppConfig;
+  subscriberDetails?: PESubscriberDetails;
   tabId?: number; // For filtering errors by tab
 }
 
 // Import PushEngage types
 import { PEAppConfig } from './pushEngage';
 export type { PEAppConfig } from './pushEngage';
+
+// Re-export subscriber details type from tools/types for convenience
+import type { SubscriberDetails } from '../tools/types';
+export type PESubscriberDetails = SubscriberDetails;
 

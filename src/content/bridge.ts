@@ -3,11 +3,13 @@
 
 interface DevDebugMessage {
   source: 'devdebug-ai';
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS';
   error?: unknown;
   hasPushEngage?: boolean;
   url?: string;
   config?: unknown;
+  available?: boolean;
+  data?: unknown;
 }
 
 // Listen for messages from the MAIN world content script
@@ -25,7 +27,9 @@ window.addEventListener('message', (event) => {
       error: data.error,
       hasPushEngage: data.hasPushEngage,
       url: data.url,
-      config: data.config
+      config: data.config,
+      available: data.available,
+      subscriberDetails: data.data
     }).catch(() => {
       // Extension context may be invalidated, ignore
     });

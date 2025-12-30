@@ -35,12 +35,12 @@ export const SegmentCriteriaSchema = z
       .object({
         start: z
           .array(z.string())
-          .describe('Events that include users in the segment'),
+          .describe('Events that include subscribers in the segment'),
       })
       .describe('Inclusion rules for the segment'),
   })
   .nullable()
-  .describe('Rules defining how users qualify for the segment');
+  .describe('Rules defining how subscribers qualify for the segment');
 
 export const SegmentSchema = z.object({
   add_segment_on_page_load: z
@@ -51,11 +51,11 @@ export const SegmentSchema = z.object({
 
   segment_id: z
     .number()
-    .describe('Unique identifier of the segment'),
+    .describe('Unique Id of the segment'),
 
   segment_name: z
     .string()
-    .describe('Human-readable name of the segment'),
+    .describe('Name of the segment'),
 });
 
 // ============================================================
@@ -98,7 +98,7 @@ export const SiteSchema = z.object({
 
   site_url: z
     .string()
-    .describe('Primary URL of the site'),
+    .describe('Site URL  iof the site'),
 });
 
 // ============================================================
@@ -627,4 +627,124 @@ export type DocParameter = z.infer<typeof DocParameterSchema>;
 export type DocApiMethod = z.infer<typeof DocApiMethodSchema>;
 export type DocPage = z.infer<typeof DocPageSchema>;
 export type DocCache = z.infer<typeof DocCacheSchema>;
+
+// ============================================================
+// SUBSCRIBER DETAILS SCHEMA
+// ============================================================
+
+/**
+ * Schema for subscriber metadata from localStorage.PushEngageSDK
+ */
+export const SubscriberDataSchema = z.object({
+  city: z
+    .string()
+    .describe('City of the subscriber'),
+
+  country: z
+    .string()
+    .describe('Country of the subscriber'),
+
+  device: z
+    .string()
+    .describe('Device category such as desktop or mobile'),
+
+  device_type: z
+    .string()
+    .describe('Browser or device type used during subscription'),
+
+  has_unsubscribed: z
+    .number()
+    .describe('Unsubscribe flag (0 = subscribed, 1 = unsubscribed)'),
+
+  host: z
+    .string()
+    .describe('Host domain on which the subscription occurred'),
+
+  language: z
+    .string()
+    .describe('Browser language preference'),
+
+  notification_disabled: z
+    .number()
+    .describe('Notification disabled flag (0 = enabled, 1 = disabled)'),
+
+  state: z
+    .string()
+    .describe('State or region of the subscriber'),
+
+  subscription_url: z
+    .string()
+    .describe('URL where the subscription was created'),
+
+  timezone: z
+    .string()
+    .describe('Timezone of the subscriber'),
+
+  ts_created: z
+    .string()
+    .describe('ISO timestamp when the subscription was created'),
+
+  user_agent: z
+    .string()
+    .describe('Full browser user agent string'),
+
+  vapid_public_key: z
+    .string()
+    .describe('VAPID public key used for push subscription'),
+
+  attributes: z
+    .record(z.string(), z.any())
+    .describe('Custom key-value attributes associated with the subscriber'),
+
+  segments: z
+    .array(z.any())
+    .describe('List of segment identifiers the subscriber belongs to'),
+
+  trigger_status: z
+    .number()
+    .describe('Triggered campaign status flag (1 = enabled, 0 = disabled)'),
+}).describe('Detailed subscriber metadata');
+
+/**
+ * Schema for the subscriber container object
+ */
+export const SubscriberContainerSchema = z.object({
+  expiresAt: z
+    .number()
+    .describe('Timestamp (in milliseconds) when the current subscription details will be refreshed or updated by PushEngage'),
+
+  data: SubscriberDataSchema,
+}).describe('Subscriber container object');
+
+/**
+ * Complete PushEngage subscriber details schema from localStorage.PushEngageSDK
+ */
+export const SubscriberDetailsSchema = z.object({
+  isSubDomain: z
+    .boolean()
+    .describe('Indicates whether the subscription belongs to a subdomain'),
+
+  appId: z
+    .string()
+    .describe('Unique PushEngage site key or app id'),
+
+  id: z
+    .string()
+    .describe('Unique PushEngage subscriber id or PushEngage hashed subscriber identifier'),
+
+  isSubscribed: z
+    .boolean()
+    .describe('Indicates whether the current user is currently subscribed or not'),
+
+  endpoint: z
+    .string()
+    .describe('FCM endpoint to send notification to the current subscriber'),
+
+  subscriber: SubscriberContainerSchema,
+}).describe('Complete PushEngage subscriber details object containing all the subscriber information');
+
+// Type exports for subscriber details
+export type SubscriberData = z.infer<typeof SubscriberDataSchema>;
+export type SubscriberContainer = z.infer<typeof SubscriberContainerSchema>;
+export type SubscriberDetails = z.infer<typeof SubscriberDetailsSchema>;
 
