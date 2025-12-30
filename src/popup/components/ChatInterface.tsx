@@ -282,7 +282,7 @@ export default function ChatInterface({
         ) : (
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
             <p className="text-xs text-blue-700">
-              💡 General AI Assistant - Ask me anything about web development, JavaScript, debugging, or any other topic!
+              💡 General AI Assistant - Ask me anything!
             </p>
           </div>
         )}
@@ -297,10 +297,10 @@ export default function ChatInterface({
               {mode === 'debug' && selectedError
                 ? 'Ask questions about the error or request debugging help'
                 : mode === 'pushengage' && peData
-                  ? 'Ask questions about your PushEngage configuration'
+                  ? 'Ask your PushEngage-related questions, and I’ll help you with setup, APIs, and configuration'
                   : mode === 'general'
-                    ? 'Ask me anything - coding, debugging, web development, or general questions!'
-                    : 'Ask me anything about web development, debugging, or PushEngage!'}
+                    ? 'Ask me anything!'
+                    : 'Ask me anything!'}
             </p>
             {/* Show example queries */}
             <div className="mt-4 space-y-2">
@@ -313,17 +313,17 @@ export default function ChatInterface({
                 </div>
               ) : mode === 'pushengage' && peData ? (
                 <div className="flex flex-wrap gap-2 justify-center">
-                  <ExampleChip text="List all campaigns" onClick={() => setInput("Show me all active campaigns")} />
-                  <ExampleChip text="Cart abandonment settings" onClick={() => setInput("What are my cart abandonment settings?")} />
+                  <ExampleChip text="Service worker configuration" onClick={() => setInput("Show me the service worker configuration  ")} />
                   <ExampleChip text="Opt-in configuration" onClick={() => setInput("Explain my opt-in configuration")} />
+                  <ExampleChip text="Unsubscribe Button Widget settings" onClick={() => setInput("Show me the Unsubscribe Button Widget settings")} />
                 </div>
               ) : mode === 'general' ? (
                 // General mode examples
                 <div className="flex flex-wrap gap-2 justify-center">
-                  <ExampleChip text="Explain async/await" onClick={() => setInput("How does async/await work in JavaScript?")} />
-                  <ExampleChip text="Best practices for React" onClick={() => setInput("What are the best practices for React development?")} />
-                  <ExampleChip text="CSS Grid vs Flexbox" onClick={() => setInput("When should I use CSS Grid vs Flexbox?")} />
-                  <ExampleChip text="Debug CORS errors" onClick={() => setInput("How do I debug CORS errors?")} />
+                  <ExampleChip text="What is artificial intelligence?" onClick={() => setInput("What is artificial intelligence and how does it work?")} />
+                  <ExampleChip text="How does the internet work?" onClick={() => setInput("How does the internet work?")} />
+                  <ExampleChip text="What is the meaning of life?" onClick={() => setInput("What is the meaning of life?")} />
+                  <ExampleChip text="How do I learn programming?" onClick={() => setInput("How do I start learning programming as a beginner?")} />
                 </div>
               ) : mode === 'debug' ? (
                 // Debug mode without selected error
