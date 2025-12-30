@@ -1,5 +1,5 @@
 // DevDebug AI - Background Service Worker
-import type { ConsoleError, PEAppConfig } from '../types';
+import type { ConsoleError, PEAppConfig, PELog } from '../types';
 
 // Import subscriber details type
 import type { SubscriberDetails } from '../tools/types';
@@ -7,15 +7,18 @@ import type { SubscriberDetails } from '../tools/types';
 // Storage data interface for reference (used implicitly via chrome.storage)
 export type StorageData = {
   errors: ConsoleError[];
+  peLogs: PELog[];
   peConfig: PEAppConfig | null;
   peAvailable: boolean;
   peTabUrls: Record<number, boolean>;
+  peDebugTabs: Record<number, boolean>; // tabId -> debug mode active
   peSubscriberDetails: SubscriberDetails | null;
   peSubscriberAvailable: boolean;
   tabSessions: Record<number, number>; // tabId -> sessionId mapping
 };
 
 const MAX_ERRORS = 50;
+const MAX_PE_LOGS = 200;
 
 // Track active sessions per tab (in-memory for quick access)
 const tabSessions: Map<number, number> = new Map();
@@ -24,9 +27,11 @@ const tabSessions: Map<number, number> = new Map();
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({
     errors: [],
+    peLogs: [],
     peConfig: null,
     peAvailable: false,
     peTabUrls: {},
+    peDebugTabs: {},
     peSubscriberDetails: null,
     peSubscriberAvailable: false,
     tabSessions: {}
@@ -78,6 +83,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handlePESubscriberDetails(message.subscriberDetails, message.available, tabId);
       break;
 
+    case 'PE_LOG':
+      handlePELog(message.log, tabId);
+      break;
+
+    case 'PE_DEBUG_STATUS':
+      handlePEDebugStatus(message.debugActive, tabId);
+      break;
+
+    case 'GET_PE_LOGS':
+      getPELogs(message.tabId || tabId).then(sendResponse);
+      return true;
+
+    case 'CLEAR_PE_LOGS':
+      clearPELogs(message.tabId).then(() => sendResponse({ success: true }));
+      return true;
+
+    case 'GET_PE_DEBUG_STATUS':
+      getPEDebugStatus(message.tabId || tabId).then(sendResponse);
+      return true;
+
     case 'GET_PE_SUBSCRIBER':
       getPESubscriberDetails(message.tabId || tabId).then(sendResponse);
       return true;
@@ -124,6 +149,9 @@ async function handlePageSessionStart(sessionId: number, url: string, tabId?: nu
 
   // Clear all errors for this tab (fresh start)
   await clearErrors(tabId);
+
+  // Clear all PE logs for this tab (fresh start)
+  await clearPELogs(tabId);
 
   // Update badge to 0
   updateBadge(0, tabId);
@@ -222,6 +250,111 @@ async function handlePESubscriberDetails(
     });
   } catch (err) {
     console.error('DevDebug: Failed to store PE subscriber details:', err);
+  }
+}
+
+// ===== PUSHENGAGE DEBUG LOGS =====
+
+// Handle PE debug log capture
+async function handlePELog(log: PELog, tabId?: number): Promise<void> {
+  if (!log) return;
+
+  try {
+    // Verify the log belongs to the current session
+    if (tabId && log.sessionId) {
+      const currentSession = tabSessions.get(tabId);
+      if (currentSession && log.sessionId !== currentSession) {
+        // Log is from a previous session, ignore it
+        console.log(`DevDebug: Ignoring PE log from old session ${log.sessionId} (current: ${currentSession})`);
+        return;
+      }
+    }
+
+    const { peLogs = [] } = await chrome.storage.local.get('peLogs') as { peLogs: PELog[] };
+
+    // Check for duplicate (same message within last 1 second)
+    const isDuplicate = peLogs.some(l =>
+      l.message === log.message &&
+      l.tabId === tabId &&
+      Math.abs(l.timestamp - log.timestamp) < 1000
+    );
+
+    if (!isDuplicate) {
+      // Add tabId to the log
+      const logWithTab: PELog = {
+        ...log,
+        tabId: tabId
+      };
+
+      // Add new log and maintain max limit (FIFO)
+      const updatedLogs = [...peLogs, logWithTab].slice(-MAX_PE_LOGS);
+      await chrome.storage.local.set({ peLogs: updatedLogs });
+    }
+  } catch (err) {
+    console.error('DevDebug: Failed to store PE log:', err);
+  }
+}
+
+// Handle PE debug status change
+async function handlePEDebugStatus(debugActive: boolean, tabId?: number): Promise<void> {
+  try {
+    const { peDebugTabs = {} } = await chrome.storage.local.get('peDebugTabs') as { peDebugTabs: Record<number, boolean> };
+
+    if (tabId) {
+      peDebugTabs[tabId] = debugActive;
+    }
+
+    await chrome.storage.local.set({ peDebugTabs });
+  } catch (err) {
+    console.error('DevDebug: Failed to store PE debug status:', err);
+  }
+}
+
+// Get PE logs - optionally filtered by tabId
+async function getPELogs(tabId?: number): Promise<PELog[]> {
+  try {
+    const { peLogs = [] } = await chrome.storage.local.get('peLogs') as { peLogs: PELog[] };
+
+    // If tabId is provided, filter logs for that tab
+    if (tabId !== undefined) {
+      return peLogs.filter(l => l.tabId === tabId);
+    }
+
+    return peLogs;
+  } catch {
+    return [];
+  }
+}
+
+// Clear PE logs - optionally filtered by tabId
+async function clearPELogs(tabId?: number): Promise<void> {
+  try {
+    if (tabId !== undefined) {
+      // Clear only logs for the specific tab
+      const { peLogs = [] } = await chrome.storage.local.get('peLogs') as { peLogs: PELog[] };
+      const filteredLogs = peLogs.filter(l => l.tabId !== tabId);
+      await chrome.storage.local.set({ peLogs: filteredLogs });
+    } else {
+      // Clear all logs
+      await chrome.storage.local.set({ peLogs: [] });
+    }
+  } catch (err) {
+    console.error('DevDebug: Failed to clear PE logs:', err);
+  }
+}
+
+// Get PE debug status for a tab
+async function getPEDebugStatus(tabId?: number): Promise<{ active: boolean }> {
+  try {
+    const { peDebugTabs = {} } = await chrome.storage.local.get('peDebugTabs') as { peDebugTabs: Record<number, boolean> };
+    
+    if (tabId !== undefined) {
+      return { active: peDebugTabs[tabId] || false };
+    }
+    
+    return { active: false };
+  } catch {
+    return { active: false };
   }
 }
 
@@ -529,15 +662,26 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     tabSessions.delete(tabId);
 
     // Clean up PE tab tracking
-    const { peTabUrls = {} } = await chrome.storage.local.get('peTabUrls') as { peTabUrls: Record<number, boolean> };
+    const { peTabUrls = {}, peDebugTabs = {} } = await chrome.storage.local.get(['peTabUrls', 'peDebugTabs']) as { 
+      peTabUrls: Record<number, boolean>;
+      peDebugTabs: Record<number, boolean>;
+    };
     delete peTabUrls[tabId];
-    await chrome.storage.local.set({ peTabUrls });
+    delete peDebugTabs[tabId];
+    await chrome.storage.local.set({ peTabUrls, peDebugTabs });
     
     // Clean up errors for closed tab
     const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
     const filteredErrors = errors.filter(e => e.tabId !== tabId);
     if (filteredErrors.length !== errors.length) {
       await chrome.storage.local.set({ errors: filteredErrors });
+    }
+
+    // Clean up PE logs for closed tab
+    const { peLogs = [] } = await chrome.storage.local.get('peLogs') as { peLogs: PELog[] };
+    const filteredLogs = peLogs.filter(l => l.tabId !== tabId);
+    if (filteredLogs.length !== peLogs.length) {
+      await chrome.storage.local.set({ peLogs: filteredLogs });
     }
   } catch {
     // Ignore cleanup errors

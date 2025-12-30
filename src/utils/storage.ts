@@ -1,5 +1,5 @@
 // Chrome Storage Utilities
-import type { ConsoleError, ApiConfig, PEAppConfig, PESubscriberDetails } from '../types';
+import type { ConsoleError, ApiConfig, PEAppConfig, PESubscriberDetails, PELog } from '../types';
 import type { DocCache } from '../tools/types';
 
 // ===== CONSTANTS =====
@@ -82,6 +82,59 @@ export function exportErrorsAsJSON(errors: ConsoleError[]): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `devdebug-errors-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ===== PUSHENGAGE DEBUG LOGS =====
+
+/**
+ * Get PE debug logs, optionally filtered by tab ID
+ * @param tabId - If provided, only returns logs from that specific tab
+ */
+export async function getPELogs(tabId?: number): Promise<PELog[]> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_PE_LOGS', tabId });
+    return response || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Clear PE debug logs, optionally only for a specific tab
+ * @param tabId - If provided, only clears logs from that specific tab
+ */
+export async function clearPELogs(tabId?: number): Promise<void> {
+  await chrome.runtime.sendMessage({ type: 'CLEAR_PE_LOGS', tabId });
+}
+
+/**
+ * Get PE debug mode status for a tab
+ * @param tabId - The tab ID to check debug status for
+ */
+export async function getPEDebugStatus(tabId?: number): Promise<{ active: boolean }> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_PE_DEBUG_STATUS', tabId });
+    return response || { active: false };
+  } catch {
+    return { active: false };
+  }
+}
+
+/**
+ * Export PE logs as JSON file
+ */
+export function exportPELogsAsJSON(logs: PELog[]): void {
+  const dataStr = JSON.stringify(logs, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pushengage-debug-logs-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

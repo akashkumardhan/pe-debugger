@@ -13,6 +13,15 @@ interface CapturedError {
   sessionId: number; // Session ID to track page load sessions
 }
 
+interface CapturedPELog {
+  id: number;
+  type: 'log' | 'debug';
+  message: string;
+  timestamp: number;
+  url: string;
+  sessionId: number;
+}
+
 interface PEConfig {
   browseAbandonments?: unknown[];
   cartAbandonments?: unknown[];
@@ -170,7 +179,117 @@ interface PESubscriberDetails {
     return match ? parseInt(match[1], 10) : 0;
   }
 
+  // ===== PUSHENGAGE DEBUG LOG CAPTURE =====
+  const originalLog = console.log;
+  const originalDebug = console.debug;
+  const seenPELogs = new Map<string, number>();
+  let peDebugActive = false;
+
+  // Check if PushEngage debug mode is active
+  function checkPEDebugMode(): boolean {
+    try {
+      const debugFlag = sessionStorage.getItem('PushEngageSDKDebug');
+      // Check for both boolean true and string "true"
+      return debugFlag === 'true' || debugFlag === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  // Update debug mode status and notify extension
+  function updatePEDebugStatus(): void {
+    const wasActive = peDebugActive;
+    peDebugActive = checkPEDebugMode();
+    
+    // Only send status update if changed
+    if (wasActive !== peDebugActive) {
+      window.postMessage({
+        source: 'devdebug-ai',
+        type: 'PE_DEBUG_STATUS',
+        debugActive: peDebugActive,
+        url: window.location.href
+      }, '*');
+    }
+  }
+
+  // Capture PushEngage debug logs
+  function capturePELog(type: 'log' | 'debug', args: unknown[]): void {
+    // Only capture if debug mode is active
+    if (!peDebugActive) return;
+
+    const message = args.map(arg => {
+      if (typeof arg === 'object') {
+        try {
+          return JSON.stringify(arg);
+        } catch {
+          return String(arg);
+        }
+      }
+      return String(arg);
+    }).join(' ');
+
+    // Only capture logs that contain "PushEngage" (case-insensitive check for flexibility)
+    if (!message.includes('PushEngage')) return;
+
+    // Skip DevDebug's own messages
+    if (message.includes('DevDebug')) return;
+
+    const logKey = `${type}-${message}`;
+    const now = Date.now();
+
+    // Deduplicate within 1 second (logs can be frequent)
+    if (seenPELogs.has(logKey)) {
+      const lastSeen = seenPELogs.get(logKey)!;
+      if (now - lastSeen < 1000) return;
+    }
+    seenPELogs.set(logKey, now);
+
+    // Clean up old entries
+    if (seenPELogs.size > 200) {
+      const entries = Array.from(seenPELogs.entries());
+      entries
+        .filter(([, time]) => now - time > 30000)
+        .forEach(([key]) => seenPELogs.delete(key));
+    }
+
+    const log: CapturedPELog = {
+      id: Date.now() + Math.random(),
+      type,
+      message,
+      timestamp: now,
+      url: window.location.href,
+      sessionId: SESSION_ID
+    };
+
+    // Send to extension
+    window.postMessage({
+      source: 'devdebug-ai',
+      type: 'PE_LOG',
+      log
+    }, '*');
+  }
+
+  // Override console.log
+  console.log = function(...args: unknown[]) {
+    capturePELog('log', args);
+    originalLog.apply(console, args);
+  };
+
+  // Override console.debug
+  console.debug = function(...args: unknown[]) {
+    capturePELog('debug', args);
+    originalDebug.apply(console, args);
+  };
+
+  // Initial debug mode check
+  updatePEDebugStatus();
+
+  // Periodic debug mode check (every 2 seconds)
+  setInterval(updatePEDebugStatus, 2000);
+
   // ===== PUSHENGAGE DETECTION =====
+  let debugModeEnabled = false; // Track if we've already enabled debug mode
+
   function detectPushEngage(): void {
     const hasPushEngage = typeof (window as unknown as { PushEngage?: unknown }).PushEngage !== 'undefined';
 
@@ -186,6 +305,24 @@ interface PESubscriberDetails {
     readSubscriberDetails();
 
     if (hasPushEngage) {
+      // Auto-enable debug mode if not already enabled
+      if (!debugModeEnabled && !checkPEDebugMode()) {
+        try {
+          const pe = (window as unknown as { PushEngage: { debug: () => void } }).PushEngage;
+          if (typeof pe.debug === 'function') {
+            pe.debug();
+            debugModeEnabled = true;
+            // Update debug status after enabling
+            setTimeout(() => {
+              updatePEDebugStatus();
+            }, 100);
+            console.log('%c🔧 DevDebug AI: PushEngage debug mode auto-enabled', 'color: #4642E5; font-weight: bold;');
+          }
+        } catch (err) {
+          console.warn('DevDebug: Failed to auto-enable PE debug mode:', err);
+        }
+      }
+
       try {
         const pe = (window as unknown as { PushEngage: { getAppConfig: () => unknown } }).PushEngage;
         const peConfig = pe.getAppConfig();

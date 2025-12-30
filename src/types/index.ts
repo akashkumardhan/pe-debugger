@@ -12,6 +12,17 @@ export interface ConsoleError {
   sessionId?: number; // Session ID to track page load sessions (prevents duplicates across refreshes)
 }
 
+// PushEngage Debug Log Types
+export interface PELog {
+  id: number;
+  type: 'log' | 'debug';
+  message: string;
+  timestamp: number;
+  url: string;
+  tabId?: number;
+  sessionId?: number;
+}
+
 // Chat Message Types
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -46,9 +57,11 @@ export interface AppState {
 
 // Message Types for Chrome Runtime
 export interface ChromeMessage {
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'GET_ERRORS' | 'CLEAR_ERRORS' | 'GET_PE_CONFIG' | 'GET_PE_STATUS' | 'GET_PE_SUBSCRIBER' | 'PAGE_SESSION_START' | 'REFRESH_ERRORS';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'GET_ERRORS' | 'CLEAR_ERRORS' | 'GET_PE_CONFIG' | 'GET_PE_STATUS' | 'GET_PE_SUBSCRIBER' | 'PAGE_SESSION_START' | 'REFRESH_ERRORS' | 'PE_LOG' | 'PE_DEBUG_STATUS' | 'GET_PE_LOGS' | 'CLEAR_PE_LOGS' | 'GET_PE_DEBUG_STATUS';
   error?: ConsoleError;
+  log?: PELog;
   hasPushEngage?: boolean;
+  debugActive?: boolean;
   url?: string;
   config?: PEAppConfig;
   subscriberDetails?: PESubscriberDetails;

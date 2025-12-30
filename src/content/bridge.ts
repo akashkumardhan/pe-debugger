@@ -3,9 +3,11 @@
 
 interface DevDebugMessage {
   source: 'devdebug-ai';
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'PAGE_SESSION_START';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'PAGE_SESSION_START' | 'PE_LOG' | 'PE_DEBUG_STATUS';
   error?: unknown;
+  log?: unknown;
   hasPushEngage?: boolean;
+  debugActive?: boolean;
   url?: string;
   config?: unknown;
   available?: boolean;
@@ -26,7 +28,9 @@ window.addEventListener('message', (event) => {
     chrome.runtime.sendMessage({
       type: data.type,
       error: data.error,
+      log: data.log,
       hasPushEngage: data.hasPushEngage,
+      debugActive: data.debugActive,
       url: data.url,
       config: data.config,
       available: data.available,

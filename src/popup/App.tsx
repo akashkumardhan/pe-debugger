@@ -1,23 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Bug, Megaphone, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
-import type { ConsoleError, ApiConfig, ChatMessage, PEAppConfig, ChatMode } from '../types';
-import { getApiConfig, getErrors, getPEStatus, getCurrentTabId } from '../utils/storage';
-import ErrorList from './components/ErrorList';
+import { ScrollText, Megaphone, MessageSquare, Settings as SettingsIcon, Bug } from 'lucide-react';
+import type { ConsoleError, ApiConfig, ChatMessage, PEAppConfig, ChatMode, PELog } from '../types';
+import { getApiConfig, getErrors, getPEStatus, getCurrentTabId, getPELogs } from '../utils/storage';
+import LogsList from './components/LogsList';
 import ChatInterface from './components/ChatInterface';
 import PushEngagePanel from './components/PushEngagePanel';
 import Settings from './components/Settings';
 import ApiKeySetup from './components/ApiKeySetup';
 
-type Tab = 'errors' | 'pushengage' | 'chat' | 'settings';
+type Tab = 'logs' | 'pushengage' | 'chat' | 'settings';
 
 export default function App() {
   // State
   const [errors, setErrors] = useState<ConsoleError[]>([]);
+  const [peLogs, setPeLogs] = useState<PELog[]>([]);
   const [selectedError, setSelectedError] = useState<ConsoleError | null>(null);
   const [peData, setPeData] = useState<PEAppConfig | null>(null);
   const [peAvailable, setPeAvailable] = useState(false);
   const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('errors');
+  const [activeTab, setActiveTab] = useState<Tab>('logs');
   const [chatMode, setChatMode] = useState<ChatMode>('pushengage');
   // Separate message histories for each mode
   const [debugMessages, setDebugMessages] = useState<ChatMessage[]>([]);
@@ -35,16 +36,18 @@ export default function App() {
         const tabId = await getCurrentTabId();
         setCurrentTabId(tabId);
 
-        const [config, errorList, peStatus] = await Promise.all([
+        const [config, errorList, peStatus, peLogsList] = await Promise.all([
           getApiConfig(),
           getErrors(tabId), // Filter errors by current tab
-          getPEStatus()
+          getPEStatus(),
+          getPELogs(tabId) // Filter PE logs by current tab
         ]);
 
         setApiConfig(config);
         setErrors(errorList);
         setPeAvailable(peStatus.available);
         setPeData(peStatus.config);
+        setPeLogs(peLogsList);
 
         // Show setup if no API key
         if (!config?.apiKey) {
@@ -61,12 +64,20 @@ export default function App() {
 
     // Listen for storage changes
     const handleStorageChange = async (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      const tabId = await getCurrentTabId();
+      
       if (changes.errors) {
         // Re-fetch errors filtered by current tab
-        const tabId = await getCurrentTabId();
         if (tabId !== undefined) {
           const filteredErrors = await getErrors(tabId);
           setErrors(filteredErrors);
+        }
+      }
+      if (changes.peLogs) {
+        // Re-fetch PE logs filtered by current tab
+        if (tabId !== undefined) {
+          const filteredLogs = await getPELogs(tabId);
+          setPeLogs(filteredLogs);
         }
       }
       if (changes.peConfig) {
@@ -91,9 +102,10 @@ export default function App() {
         setCurrentTabId(tabId);
       }
 
-      const [errorList, peStatus] = await Promise.all([
+      const [errorList, peStatus, peLogsList] = await Promise.all([
         getErrors(tabId), // Filter by current tab
-        getPEStatus()
+        getPEStatus(),
+        getPELogs(tabId) // Filter PE logs by current tab
       ]);
       
       setErrors(errorList);
@@ -101,6 +113,7 @@ export default function App() {
       if (peStatus.config) {
         setPeData(peStatus.config);
       }
+      setPeLogs(peLogsList);
     }, 3000);
 
     return () => clearInterval(interval);
@@ -164,6 +177,11 @@ export default function App() {
     setErrors(newErrors);
   }, []);
 
+  // Handle PE logs update (for clearing)
+  const handlePELogsUpdate = useCallback((newLogs: PELog[]) => {
+    setPeLogs(newLogs);
+  }, []);
+
   // Loading state
   if (isLoading) {
     return (
@@ -189,12 +207,14 @@ export default function App() {
   // Tab content
   const renderContent = () => {
     switch (activeTab) {
-      case 'errors':
+      case 'logs':
         return (
-          <ErrorList
+          <LogsList
             errors={errors}
+            peLogs={peLogs}
             onAnalyze={handleAnalyzeError}
-            onUpdate={handleErrorsUpdate}
+            onErrorsUpdate={handleErrorsUpdate}
+            onPELogsUpdate={handlePELogsUpdate}
             currentTabId={currentTabId}
           />
         );
@@ -234,7 +254,7 @@ export default function App() {
   };
 
   const tabs: { id: Tab; icon: React.ReactNode; label: string; badge?: number }[] = [
-    { id: 'errors', icon: <Bug size={18} />, label: 'Errors', badge: errors.length },
+    { id: 'logs', icon: <ScrollText size={18} />, label: 'Logs', badge: errors.length + peLogs.length > 0 ? errors.length + peLogs.length : undefined },
     { id: 'pushengage', icon: <Megaphone size={18} />, label: 'PE' },
     { id: 'chat', icon: <MessageSquare size={18} />, label: 'Chat' },
     { id: 'settings', icon: <SettingsIcon size={18} />, label: 'Settings' }
