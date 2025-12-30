@@ -153,7 +153,7 @@ ${formatCampaignList(config.customTriggerCampaigns || [], 'Custom Triggers')}
    */
   private formatSegments(config: PEAppConfig): string {
     const segmentsList = config.segments?.length 
-      ? config.segments.map(s => `  • ${s.name}`).join('\n')
+      ? config.segments.map(s => `  • ${s.segment_name} (ID: ${s.segment_id}, Auto-add: ${s.add_segment_on_page_load ? 'Yes' : 'No'})`).join('\n')
       : '  None configured';
 
     const attrsList = config.subscriberAttributes?.length

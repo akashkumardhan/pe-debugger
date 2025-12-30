@@ -243,10 +243,16 @@ export interface PESiteSettings {
 
 // Segment
 export interface PESegment {
-  id: number;
-  name: string;
-  description?: string;
-  subscriber_count?: number;
+  segment_id: number;
+  segment_name: string;
+  add_segment_on_page_load: boolean;
+  segment_criteria: {
+    include?: {
+      start?: string[];
+      contains?: string[];
+      exact?: string[];
+    };
+  } | null;
 }
 
 // Subscriber Attribute

@@ -55,7 +55,7 @@ export const SegmentSchema = z.object({
 
   segment_name: z
     .string()
-    .describe('Name of the segment'),
+    .describe('Segment name or Title of the segment'),
 });
 
 // ============================================================

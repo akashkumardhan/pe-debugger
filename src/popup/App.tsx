@@ -18,7 +18,7 @@ export default function App() {
   const [peAvailable, setPeAvailable] = useState(false);
   const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('errors');
-  const [chatMode, setChatMode] = useState<ChatMode>('general');
+  const [chatMode, setChatMode] = useState<ChatMode>('pushengage');
   // Separate message histories for each mode
   const [debugMessages, setDebugMessages] = useState<ChatMessage[]>([]);
   const [pushengageMessages, setPushengageMessages] = useState<ChatMessage[]>([]);
