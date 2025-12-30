@@ -124,27 +124,16 @@ export const TriggerRulesSchema = z.object({
 // ============================================================
 // OPT-IN SCHEMAS
 // ============================================================
-
-export const OptinBaseSchema = z.object({
+export const OptinFullSchema = z.object({
   cookie_duration: z.number().describe('Cookie duration in days.If user has denied/closed the subscription opt-in, this setting will show the subscription opt-in after configured number of days.'),
   optin_category: z.string().describe('Opt-in/subscription popup modal category type'),
   optin_delay: z.number().describe('Delay before opt-in/subscription popup modal appears'),
   optin_scroll: z.number().describe('Scroll percentage to trigger opt-in/subscription popup modal'),
   popup_disabled: z.number().describe('Whether popup is disabled'),
   optin_type: z.number().describe('Opt-in/subscription popup modal type'),
-  optin_name: z.string().describe('Opt-in/subscription popup modal display name'),
+  optin_name: z.string().describe('Name of the opt-in/subscription popup modal'),
   optin_segments: z.array(z.any()).describe('Segments associated with opt-in/subscription popup modal'),
-  optin_sw_support: z.number().optional().describe('The Quick Install Settings help determine where subscribers will be collected either on the PushEngage sub-domain or on your own domain/sub-domain.When the setting is ON, subscriptions will be collected on the PushEngage sub-domain.When the setting is OFF, subscriptions will be collected on your domain/sub-domain '),
-}).describe('Base opt-in configuration');
-
-export const OptinBellSchema = z.object({
-  optin_title: z.string().describe('Opt-in/subscription popup modal title text'),
-  bg: z.string().describe('Opt-in/subscription popup modal background color'),
-  allowBtnBg: z.string().describe('Allow button background color'),
-  placement: z.string().describe('Opt-in/subscription popup modal bell placement on screen'),
-}).describe('Opt-in/subscription popup modal bell style configuration');
-
-export const OptinFullSchema = OptinBaseSchema.extend({
+  optin_sw_support: z.number().optional().describe('The Quick Install Settings help determine where subscribers will be collected either on the PushEngage sub-domain or on your own domain/sub-domain.When the setting is ON, subscriptions will be collected on the PushEngage sub-domain.When the setting is OFF, subscriptions will be collected on your domain/sub-domain. But, for optin type 4(i.e, single step optin  there is not concept of Quick Install Settings) '),
   optin_allow_btn_txt: z.string().describe('Opt-in/subscription popup modal allow button text'),
   optin_title: z.string().describe('Opt-in/subscription popup modal title text'),
   bg: z.string().describe('Opt-in/subscription popup modal background color'),
@@ -160,24 +149,12 @@ export const OptinsSchema = z.record(
   z.object({
     desktop: z.object({
       http: OptinFullSchema.optional(),
-      https: OptinFullSchema
-        .or(
-          OptinBaseSchema.extend({
-            bell: OptinBellSchema,
-          })
-        )
-        .optional(),
+      https: OptinFullSchema.optional(),
     }).describe('Desktop opt-in or popup modal settings'),
 
     mobile: z.object({
       http: OptinFullSchema.optional(),
-      https: OptinFullSchema
-        .or(
-          OptinBaseSchema.extend({
-            bell: OptinBellSchema,
-          })
-        )
-        .optional(),
+      https: OptinFullSchema.optional(),
     }).describe('Mobile opt-in/subscription popup modal settings'),
   })
 ).describe('All opt-in/subscription popup modal configurations');
@@ -241,17 +218,17 @@ export const SiteSettingsSchema = z.object({
       page_tagline: z.string().describe('Intermediate screen tagline'),
       allow_btn_txt: z.string().describe('Allow button text'),
       allow_btn_bg: z.string().describe('Allow button background color'),
-    }).describe('Intermediate opt-in UI'),
+    }).describe('Intermediate opt-in/subscription popup modal UI'),
 
     activeOptin: z.object({
       http: z.object({
-        types: z.array(z.number()).describe('HTTP opt-in types'),
-      }).describe('HTTP active opt-ins'),
+        types: z.array(z.number()).describe('HTTP opt-in/subscription popup modal types'),
+      }).describe('HTTP active opt-in/subscription popup modal '),
 
       https: z.object({
-        types: z.array(z.number()).describe('HTTPS opt-in types'),
+        types: z.array(z.number()).describe('HTTPS opt-in/subscription popup modal  types'),
       }).describe('HTTPS active opt-ins'),
-    }).describe('List of all active opt-in configuration'),
+    }).describe('List of all active opt-in/subscription popup modal  configuration'),
 
     optins: OptinsSchema,
   }).describe('All opt-in or popup modal related configuration'),
@@ -449,8 +426,6 @@ export type Segment = z.infer<typeof SegmentSchema>;
 export type Site = z.infer<typeof SiteSchema>;
 export type RulesInclude = z.infer<typeof RulesIncludeSchema>;
 export type TriggerRules = z.infer<typeof TriggerRulesSchema>;
-export type OptinBase = z.infer<typeof OptinBaseSchema>;
-export type OptinBell = z.infer<typeof OptinBellSchema>;
 export type OptinFull = z.infer<typeof OptinFullSchema>;
 export type Optins = z.infer<typeof OptinsSchema>;
 export type SiteSettings = z.infer<typeof SiteSettingsSchema>;

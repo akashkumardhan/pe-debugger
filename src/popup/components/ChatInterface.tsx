@@ -313,9 +313,13 @@ export default function ChatInterface({
                 </div>
               ) : mode === 'pushengage' && peData ? (
                 <div className="flex flex-wrap gap-2 justify-center">
-                  <ExampleChip text="Service worker configuration" onClick={() => setInput("Show me the service worker configuration  ")} />
-                  <ExampleChip text="Opt-in configuration" onClick={() => setInput("Explain my opt-in configuration")} />
-                  <ExampleChip text="Unsubscribe Button Widget settings" onClick={() => setInput("Show me the Unsubscribe Button Widget settings")} />
+                  <ExampleChip text="Service worker configuration" onClick={() => setInput("What is the service worker setting for this site?  ")} />
+                  <ExampleChip text="Opt-in/Pop-Up configuration" onClick={() => setInput("What is the opt-in/pop-up configuration for this site?")} />
+                  <ExampleChip text="Unsubscribe Button Widget settings" onClick={() => setInput("What is the unsubscribe button widget settings for this site?")} />
+                  <ExampleChip text="Segment configuration" onClick={() => setInput("What is the segment present in this site?")} />
+                  <ExampleChip text="Campaign configuration" onClick={() => setInput("What is the campaign configuration for this site?")} />
+                  <ExampleChip text="Subscriber details" onClick={() => setInput("Show me the current subscriber details including the subscriber id ?")} />
+                  <ExampleChip text="Subscription on the main domain or sub-domain" onClick={() => setInput("The site is collecting subscriber in the current site or in the sub-domain ?")} />
                 </div>
               ) : mode === 'general' ? (
                 // General mode examples

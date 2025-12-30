@@ -66,6 +66,7 @@ export interface PEOptinTypeConfig {
   optin_type: number;
   optin_name: string;
   optin_sw_support: number;
+  optin_allow_btn_txt?: string;
   bell?: {
     optin_title: string;
     bg: string;
@@ -113,6 +114,13 @@ export interface PESubAnalytics {
   enabled: boolean;
 }
 
+// URL Include Rules for Trigger Button
+export interface PERulesInclude {
+  start?: string[];
+  contains?: string[];
+  exact?: string[];
+}
+
 // Subscription Management Widget Trigger Button
 export interface PETriggerButton {
   enabled: boolean;
@@ -132,7 +140,7 @@ export interface PETriggerButton {
     exclude: Record<string, unknown>;
     include_countries: string[];
     include_devices: string[];
-    include: Record<string, unknown>;
+    include: PERulesInclude;
   };
 }
 
@@ -226,14 +234,47 @@ export interface PEShopifyOptions {
   };
 }
 
+// Unsubscribe Button Widget Settings
+export interface PESubManagementButton {
+  position: string;
+  bg: string;
+  color: string;
+  unsubMsg: string;
+  thankMsg: string;
+  confirmMsg: string;
+  ConfirmActionYes: string;
+  ConfirmActionNo: string;
+}
+
+export interface PESubManagementSettings {
+  button: PESubManagementButton;
+  settings: {
+    rules: Record<string, unknown>;
+  };
+}
+
+// Opt-in Management / Targeting Rule Settings
+export interface PEOptinManagementRule {
+  id: number;
+  rule: 'start' | 'contains' | 'exact';
+  value: string;
+}
+
+export interface PEOptinManagementSettings {
+  include: PEOptinManagementRule[];
+  include_countries: string[];
+}
+
 // Full Site Settings
 export interface PESiteSettings {
   chicklet_settings: PEChickletSettings;
   gcm_options: PEGcmOptions;
   optin_settings: PEOptinSettings;
+  optin_management_settings: PEOptinManagementSettings;
   privacy_settings: PEPrivacySettings;
   service_worker: PEServiceWorker;
   sub_analytics: PESubAnalytics;
+  sub_management_settings: PESubManagementSettings;
   subscription_management_widget: PESubscriptionManagementWidget;
   vapid_key: PEVapidKey;
   reset_notification_permission_popup: PEResetNotificationPermissionPopup;
