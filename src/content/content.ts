@@ -10,6 +10,7 @@ interface CapturedError {
   lineno: number;
   timestamp: number;
   url: string;
+  sessionId: number; // Session ID to track page load sessions
 }
 
 interface PEConfig {
@@ -39,6 +40,19 @@ interface PESubscriberDetails {
 
 (function() {
   'use strict';
+
+  // ===== SESSION MANAGEMENT =====
+  // Generate a unique session ID for this page load
+  // This ensures errors from previous page loads are cleared
+  const SESSION_ID = Date.now();
+
+  // Send session start message FIRST to clear old errors
+  window.postMessage({
+    source: 'devdebug-ai',
+    type: 'PAGE_SESSION_START',
+    sessionId: SESSION_ID,
+    url: window.location.href
+  }, '*');
 
   // ===== ERROR CAPTURE =====
   const originalError = console.error;
@@ -125,7 +139,8 @@ interface PESubscriberDetails {
       filename: filename || extractFileFromStack(actualStack),
       lineno: lineno || extractLineFromStack(actualStack),
       timestamp: now,
-      url: window.location.href
+      url: window.location.href,
+      sessionId: SESSION_ID // Include session ID to associate with current page load
     };
 
     // Send to extension via custom event (since we're in MAIN world)

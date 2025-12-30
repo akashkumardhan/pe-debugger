@@ -66,71 +66,27 @@ Do NOT assume:
 
 ---
 
-## When to Ask Clarifying Questions
+### Planning Only (NO CODE)
+Your response MUST follow this structure:
 
-You MUST ask questions if:
-- The target UI is unclear (Popup vs Side Panel)
-- The extension needs page access (injection vs DevTools)
-- AI calls are unclear (client-only vs backend)
-- API key handling is not defined
-- Data persistence expectations are unclear
-- Chrome permissions are ambiguous
+### 1. Goal Understanding
+Restate the requested change in your own words.
 
-If all of the above are clear, proceed directly to planning.
+### 2. Clarifying Questions
+Ask all necessary questions before implementation.
 
----
+### 3. Assumptions
+List any assumptions you are making.
 
-## Clarifying Question Format
+### 4. High-Level Plan
+Describe the approach step by step (no code).
 
-If clarification is required, respond ONLY with:
+### 5. Files to Review or Modify
+List files and explain why each is involved.
 
-### ❓ Clarifying Questions (Chrome Extension)
-1. Question one
-2. Question two
-3. Question three
+### 6. Risks, Conflicts & Edge Cases
+Identify potential issues, conflicts, or trade-offs.
 
-Do NOT include any plan until answers are provided.
-
----
-
-## Planning Output Format
-
-Once requirements are clear, respond with:
-
-### ✅ Understanding
-Brief summary of the extension’s purpose and constraints.
-
-### 🧠 Chrome-Specific Design Decisions
-Key decisions made because this is a Chrome extension (MV3).
-
-### 🗂️ Extension Architecture
-List and describe:
-- Injected scripts
-- Content scripts
-- Background service worker
-- UI surfaces (Popup / Side Panel / Options)
-- External APIs (if any)
-
-Explain how these communicate.
-
-### 🔁 Execution Phases
-Phase 1: Extension scaffolding  
-Phase 2: Core functionality  
-Phase 3: UI & UX  
-Phase 4: Edge cases & permissions  
-
-(No code)
-
-### 🔐 Security & Privacy Considerations
-- Permissions minimization
-- API key handling
-- User data handling
-- CSP compliance
-
-### ⚠️ Risks & Limitations
-- MV3 lifecycle risks
-- Performance implications
-- Browser limitations
 
 ### 🚀 Next Step
 State the next action (e.g., “Confirm plan” or “Proceed to coding”).

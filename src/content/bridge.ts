@@ -3,13 +3,14 @@
 
 interface DevDebugMessage {
   source: 'devdebug-ai';
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'PAGE_SESSION_START';
   error?: unknown;
   hasPushEngage?: boolean;
   url?: string;
   config?: unknown;
   available?: boolean;
   data?: unknown;
+  sessionId?: number;
 }
 
 // Listen for messages from the MAIN world content script
@@ -29,7 +30,8 @@ window.addEventListener('message', (event) => {
       url: data.url,
       config: data.config,
       available: data.available,
-      subscriberDetails: data.data
+      subscriberDetails: data.data,
+      sessionId: data.sessionId
     }).catch(() => {
       // Extension context may be invalidated, ignore
     });

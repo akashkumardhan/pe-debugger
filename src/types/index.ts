@@ -9,6 +9,7 @@ export interface ConsoleError {
   timestamp: number;
   url: string;
   tabId?: number; // ID of the tab where the error occurred
+  sessionId?: number; // Session ID to track page load sessions (prevents duplicates across refreshes)
 }
 
 // Chat Message Types
@@ -45,13 +46,14 @@ export interface AppState {
 
 // Message Types for Chrome Runtime
 export interface ChromeMessage {
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'GET_ERRORS' | 'CLEAR_ERRORS' | 'GET_PE_CONFIG' | 'GET_PE_STATUS' | 'GET_PE_SUBSCRIBER';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'GET_ERRORS' | 'CLEAR_ERRORS' | 'GET_PE_CONFIG' | 'GET_PE_STATUS' | 'GET_PE_SUBSCRIBER' | 'PAGE_SESSION_START' | 'REFRESH_ERRORS';
   error?: ConsoleError;
   hasPushEngage?: boolean;
   url?: string;
   config?: PEAppConfig;
   subscriberDetails?: PESubscriberDetails;
   tabId?: number; // For filtering errors by tab
+  sessionId?: number; // Session ID for page load tracking
 }
 
 // Import PushEngage types

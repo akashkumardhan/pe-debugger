@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Search, Trash2, AlertCircle, AlertTriangle, Filter, RefreshCw } from 'lucide-react';
+import { Search, Trash2, AlertCircle, AlertTriangle, Filter } from 'lucide-react';
 import type { ConsoleError } from '../../types';
-import { clearErrors, refreshErrors, getErrors } from '../../utils/storage';
+import { clearErrors } from '../../utils/storage';
 import ErrorCard from './ErrorCard';
 
 interface ErrorListProps {
@@ -16,7 +16,6 @@ type FilterType = 'all' | 'error' | 'warning';
 export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }: ErrorListProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter and search errors
   const filteredErrors = useMemo(() => {
@@ -45,31 +44,6 @@ export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }:
     if (confirm('Are you sure you want to clear all errors for this tab?')) {
       await clearErrors(currentTabId);
       onUpdate([]);
-    }
-  };
-
-  // Handle refresh - re-fetches errors for current tab (without clearing)
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      // Ensure error capture is active and get current errors for this tab
-      const result = await refreshErrors(currentTabId);
-      if (result.success) {
-        onUpdate(result.errors);
-      } else {
-        // Fallback: fetch errors directly from storage
-        const freshErrors = await getErrors(currentTabId);
-        onUpdate(freshErrors);
-      }
-    } catch (err) {
-      console.error('Failed to refresh errors:', err);
-      // Fallback: try to get errors anyway
-      try {
-        const freshErrors = await getErrors(currentTabId);
-        onUpdate(freshErrors);
-      } catch {}
-    } finally {
-      setIsRefreshing(false);
     }
   };
 
@@ -128,14 +102,6 @@ export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }:
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-primary transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
             {errors.length > 0 && (
               <button
                 onClick={handleClearAll}
@@ -161,12 +127,12 @@ export default function ErrorList({ errors, onAnalyze, onUpdate, currentTabId }:
               )}
             </div>
             <h3 className="text-sm font-medium text-gray-700 mb-1">
-              {search || filter !== 'all' ? 'No matching errors' : 'No errors on this tab'}
+              {search || filter !== 'all' ? 'No matching errors' : 'No errors on this page'}
             </h3>
             <p className="text-xs text-gray-500">
               {search || filter !== 'all'
                 ? 'Try adjusting your search or filters'
-                : 'Console errors from the current tab will appear here'}
+                : 'Console errors from the current page session will appear here'}
             </p>
           </div>
         ) : (

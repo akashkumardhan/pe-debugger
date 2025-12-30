@@ -12,9 +12,13 @@ export type StorageData = {
   peTabUrls: Record<number, boolean>;
   peSubscriberDetails: SubscriberDetails | null;
   peSubscriberAvailable: boolean;
+  tabSessions: Record<number, number>; // tabId -> sessionId mapping
 };
 
 const MAX_ERRORS = 50;
+
+// Track active sessions per tab (in-memory for quick access)
+const tabSessions: Map<number, number> = new Map();
 
 // Initialize storage on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -24,9 +28,27 @@ chrome.runtime.onInstalled.addListener(() => {
     peAvailable: false,
     peTabUrls: {},
     peSubscriberDetails: null,
-    peSubscriberAvailable: false
+    peSubscriberAvailable: false,
+    tabSessions: {}
   });
   console.log('DevDebug AI installed');
+});
+
+// ===== WEB NAVIGATION LISTENER =====
+// Clear errors when page navigates or refreshes (backup to content script session)
+chrome.webNavigation.onCommitted.addListener(async (details) => {
+  // Only handle main frame navigation (not iframes)
+  if (details.frameId !== 0) return;
+  
+  const tabId = details.tabId;
+  
+  // Clear errors for this tab on navigation/refresh
+  // This ensures a fresh start for each page load
+  console.log(`DevDebug: Navigation detected for tab ${tabId}, clearing errors`);
+  await clearErrors(tabId);
+  
+  // Clear the session for this tab (will be set by content script)
+  tabSessions.delete(tabId);
 });
 
 // Handle messages from content scripts and popup
@@ -34,6 +56,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id;
 
   switch (message.type) {
+    case 'PAGE_SESSION_START':
+      // New page session started - clear old errors for this tab
+      handlePageSessionStart(message.sessionId, message.url, tabId);
+      break;
+
     case 'CONSOLE_ERROR':
       // Pass tabId from sender when storing errors
       handleConsoleError(message.error, tabId);
@@ -85,22 +112,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Handle console errors - now includes tabId
+// ===== SESSION MANAGEMENT =====
+// Handle new page session (page load/refresh/navigation)
+async function handlePageSessionStart(sessionId: number, url: string, tabId?: number): Promise<void> {
+  if (!tabId) return;
+
+  console.log(`DevDebug: New session ${sessionId} started for tab ${tabId} at ${url}`);
+
+  // Store the new session ID for this tab
+  tabSessions.set(tabId, sessionId);
+
+  // Clear all errors for this tab (fresh start)
+  await clearErrors(tabId);
+
+  // Update badge to 0
+  updateBadge(0, tabId);
+}
+
+// Handle console errors - now includes tabId and sessionId
 async function handleConsoleError(error: ConsoleError, tabId?: number): Promise<void> {
   if (!error) return;
 
   try {
+    // Verify the error belongs to the current session (if sessionId tracking is active)
+    if (tabId && error.sessionId) {
+      const currentSession = tabSessions.get(tabId);
+      if (currentSession && error.sessionId !== currentSession) {
+        // Error is from a previous session, ignore it
+        console.log(`DevDebug: Ignoring error from old session ${error.sessionId} (current: ${currentSession})`);
+        return;
+      }
+    }
+
     const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
 
     // Check for duplicate (same message and URL within last 5 seconds)
     const isDuplicate = errors.some(e => 
       e.message === error.message && 
       e.url === error.url &&
+      e.tabId === tabId &&
       Math.abs(e.timestamp - error.timestamp) < 5000
     );
 
     if (!isDuplicate) {
-      // Add tabId to the error
+      // Add tabId to the error (sessionId should already be present)
       const errorWithTab: ConsoleError = {
         ...error,
         tabId: tabId
@@ -470,12 +525,15 @@ async function refreshErrorsForTab(tabId?: number): Promise<{ success: boolean; 
 // Clean up when tab is closed
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   try {
+    // Clean up session tracking
+    tabSessions.delete(tabId);
+
     // Clean up PE tab tracking
     const { peTabUrls = {} } = await chrome.storage.local.get('peTabUrls') as { peTabUrls: Record<number, boolean> };
     delete peTabUrls[tabId];
     await chrome.storage.local.set({ peTabUrls });
     
-    // Optionally: Clean up errors for closed tab
+    // Clean up errors for closed tab
     const { errors = [] } = await chrome.storage.local.get('errors') as { errors: ConsoleError[] };
     const filteredErrors = errors.filter(e => e.tabId !== tabId);
     if (filteredErrors.length !== errors.length) {
