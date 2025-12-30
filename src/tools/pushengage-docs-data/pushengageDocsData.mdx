@@ -1,0 +1,1315 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+import Table from '@site/src/components/Table';
+import * as sdkData from './pushengageDocsTableData.ts';
+
+# Web SDK
+
+The `Website SDK` is the latest version of our client-side JavaScript library designed for browser environments. It enables push notifications on your website and is not intended for server-side use. Compatible with all major browsers, this library works on both HTTP and HTTPS sites and can easily be added to any website.
+
+The SDK offers various methods and events to enhance your push notification experience. These methods include `managing subscriptions`, `attributes`, `segments`, `profile IDs`, `unsubscription`, `permission prompts`, `subscription management widgets`, and more. Events capture activities such as permission prompt `displayed`, `allow`, `close`, and interactions with notifications like `displayed`, `click`, and `close`.
+
+:::info
+All methods return a promise.
+
+When we say a method returns a "promise," think of it as a system's commitment to give you a result in the future. It's a way in coding to handle tasks that might not complete immediately. A promise ensures that once the task completes, you'll either get the expected result or be informed about an error.
+:::
+
+:::caution
+The SDK methods and events will only function if the SDK is installed correctly. There are multiple ways to install the SDK; please visit the [PushEngage Dashboard](https://app.pushengage.com/onboarding?step=2) for instructions.
+:::
+
+## Initialization Options
+
+The initialization code is as follows. It's a part of the SDK installation code:
+
+```js title="JavaScript"
+PushEngage.push([
+  'init',
+  {
+    appId: 'Your Site App ID',
+    // Other initialization options
+  },
+]);
+```
+
+The SDK can be initialized with the following options:
+
+<Table data={sdkData.sdkInitializationProperties} />
+
+## Config Options
+
+This method allows for the customization of the appearance and behavior of the PushEngage SDK, providing enhanced control for adjustments based on specific pages or conditions. Presently, the configuration API exclusively supports the [Subscription Management Widget](#subscription-management-widget). All settings specified here take precedence over those configured in the <a href="https://app.pushengage.com/design/widgets" target="_blank">PushEngage Dashboard</a>.
+
+#### Syntax
+
+```js title="JavaScript"
+updateAppConfig(config);
+```
+
+#### Parameters
+
+`config`: object `{ subscriptionManagementWidget?: SubscriptionManagementWidget }`
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.updateAppConfig({
+    subscriptionManagementWidget: { enabled: false },
+  });
+});
+```
+
+#### Type of Subscription Management Widget
+
+```ts
+{
+  enabled?: boolean;
+  title?: string;
+  modal_background_color?: string;
+  modal_text_color?: string;
+  allow_text?: string;
+  on_switch_color?: string;
+  off_switch_color?: string;
+  trigger_button?: {
+    enabled?: boolean;
+    size?: 'default' | 'large' | 'small';
+    position_x?: 'right' | 'left';
+    position_y?: 'bottom' | 'top' | 'center';
+    offset_top?: number;
+    offset_bottom?: number;
+    icon_background_color?: string;
+    icon_color?: string;
+    icon_type?:
+      | 'default'
+      | 'bell'
+      | 'bell_badge'
+      | 'bell_ring'
+      | 'bell_circle'
+      | 'bell_check'
+      | 'bell_plus';
+    z_index?: number;
+  };
+  segment_preference?: {
+    enabled?: boolean;
+    title?: string;
+    segments?: string[];
+    checkbox_background_color?: string;
+    checkbox_tick_color?: string;
+    default_segment_selection?: boolean;
+    subscribed_title?: string;
+    exclude_subscribed_segments?: string[];
+    show_all_subscribed_segment?: boolean;
+  };
+  unsubscribe_options?: {
+    enabled?: boolean;
+    confirm_message?: string;
+    ok_text?: string;
+    cancel_text?: string;
+    ok_button_background_color?: string;
+    ok_button_text_color?: string;
+    cancel_button_background_color?: string;
+    cancel_button_text_color?: string;
+  };
+  personal_notification_options?: {
+    enabled?: boolean;
+    label?: string;
+  };
+};
+```
+
+## Display Native Permission Prompt / Single Step Opt-in
+
+This method displays the single step opt-in prompt for users. By using this opt-in, users can subscribe to push notifications. It's especially useful when you want to trigger the opt-in through a button or link click. This function accepts an optional parameter as a segment, which can be either a string or an array of strings. Even if all opt-ins are disabled from the [PushEngage Dashboard](https://app.pushengage.com/design/subscription-dialogbox), this method will still function.
+
+#### Syntax
+
+```js title="JavaScript"
+showNativePermissionPrompt(params)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`params`: object (optional) `{ segment?: string | string[] }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+<Tabs
+  defaultValue="without-segment"
+  values={[
+    {label: 'Without Segment', value: 'without-segment'},
+    {label: 'With Segment', value: 'with-segment'},
+  ]}
+>
+
+<TabItem value="without-segment">
+
+```javascript title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.showNativePermissionPrompt()
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+</TabItem>
+
+<TabItem value="with-segment">
+
+```javascript title="JavaScript"
+var segmentName = 'sports';
+
+PushEngage.push(function () {
+  PushEngage.showNativePermissionPrompt({ segment: segmentName })
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+</TabItem>
+
+</Tabs>
+
+```json title="Example of Success Response"
+{
+  "is_permission_changed": "<Boolean>",
+  "permission": "<Current permission of subscriber>",
+  "subscriber_id": "<Subscriber ID/Hash>",
+  "geo_info": {
+    "country": "<Country>",
+    "state": "<State>",
+    "city": "<City>"
+  }
+}
+```
+
+#### Response Object
+
+<Table data={sdkData.permissionPromptProperties} />
+
+## Triggering the Popup Modal
+
+This method triggers a popup modal for users, depending on the dashboard's popup settings. If the popup has been disabled from the dashboard, invoking this method will have no effect. It's particularly valuable if you intend to display the popup at a specific time, rather than immediately on page load.
+
+:::note
+To make this method effective, you must initialize the SDK with the disabledDefaultPrompt option set to disable the popup on page load. See the [disabledDefaultPrompt](#initialization-options) property in the initialization code for more details.
+:::
+
+#### Syntax
+
+```js title="JavaScript"
+showPermissionPrompt()
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.showPermissionPrompt()
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "is_permission_changed": "<Boolean>",
+  "permission": "<Current permission of subscriber>",
+  "subscriber_id": "<Subscriber ID/Hash>",
+  "geo_info": {
+    "country": "<Country>",
+    "state": "<State>",
+    "city": "<City>"
+  }
+}
+```
+
+#### Response Object
+
+<Table data={sdkData.permissionPromptProperties} />
+
+## Retrieve Subscriber ID
+
+This method retrieves the unique subscriber ID for a user. PushEngage generates this ID for every user based on their subscription data. Sometimes, this ID is referred to as the 'subscriber_hash'. The subscriber ID remains consistent unless there's a change in the user's subscription. If the user is not subscribed, it will return a `null` value.
+
+#### Syntax
+
+```js title="JavaScript"
+getSubscriberId().then(successFunctionCallback).catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.getSubscriberId()
+    .then(function (subscriberId) {
+      console.log(subscriberId);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+## Retrieve Subscriber Details
+
+This method retrieves the user's subscriber details, such as subscriber ID, automated notification status, subscription date, geo information, device, browser details and more. It returns a JSON object with all these details. It operates only for subscribed users; otherwise, it throws an error.
+
+#### Syntax
+
+```js title="JavaScript"
+getSubscriber().then(successFunctionCallback).catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.getSubscriber()
+    .then(function (subscriber) {
+      console.log(subscriber);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+#### Response Object
+
+<Table data={sdkData.subscriberProperties} />
+
+## Check Push Notification Support in Browser
+
+This method checks whether the browser supports push notifications. It returns a boolean value.
+
+#### Syntax
+
+```js title="JavaScript"
+isPushNotificationSupported()
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.isPushNotificationSupported()
+    .then(function (status) {
+      console.log(status);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+## Unsubscribe Subscriber
+
+This method enables you to unsubscribe the current subscriber from receiving push notifications. Once unsubscribed, the subscriber will no longer receive any push notifications.
+
+#### Syntax
+
+```js title="JavaScript"
+unsubscribe().then(successFunctionCallback).catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.unsubscribe()
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Get User Permission
+
+This method enables you to determine the current user's permission status for notifications. The possible values are `default`, `granted`, or `denied`.
+
+- **default**: The user has not been prompted yet to allow or deny notifications.
+- **granted**: The user has given permission to receive notifications.
+- **denied**: The user has chosen not to receive notifications.
+
+#### Syntax
+
+```js title="JavaScript"
+getPermission().then(successFunctionCallback).catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.getPermission()
+    .then(function (notificationPermission) {
+      console.log(notificationPermission);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+## Automated/Personalized Notifications
+
+Automated notifications include all types of triggered campaigns, such as cart abandonment, price drop, back in stock, and browse abandonment. By default, automated notifications are enabled for all subscribers.
+
+### Enabled Automated Notifications for Subscriber
+
+This method allows you to enable automated notifications for the current subscriber.
+
+#### Syntax
+
+```js title="JavaScript"
+automatedNotification(params: { status: 'enabled' })
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`params`: object `{ status: 'enabled' }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.automatedNotification({ status: 'enabled' })
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Disabled Automated Notifications for Subscriber
+
+This method allows you to disable automated notifications for the current subscriber.
+
+The subscriber will still receive other types of notifications such as Push Broadcasts, Drip Autoresponders, RSS auto push notifications, and more.
+
+#### Syntax
+
+```js title="JavaScript"
+automatedNotification(params: { status: 'disabled' })
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`params`: object `{ status: 'disabled' }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.automatedNotification({ status: 'disabled' })
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Segments
+
+Segments are used to group subscribers so that you can send personalized notifications. Segments can be created based on attributes, categories, and more. Each subscriber can belong to up to 50 segments. You can create segments either through the [PushEngage Dashboard](https://app.pushengage.com/audience/segments) or using the [rest APIs](/api/rest-api/segment/create-segment/).
+
+### Add a Subscriber to Segments
+
+This method allows adding the current subscriber to one or multiple segments.
+
+#### Syntax
+
+```js title="JavaScript"
+addSegment(segmentName)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`segmentName`: string | string[]
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var segmentName = 'books';
+
+PushEngage.push(function () {
+  PushEngage.addSegment(segmentName)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```js title="JavaScript"
+var segmentNames = ['shorts', 'tshirts'];
+
+PushEngage.push(function () {
+  PushEngage.addSegment(segmentNames)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Add a Subscriber to a Segment with Duration
+
+This method enables you to add the current subscriber to a segment for a specified duration, measured in days. After this period, the segment will be automatically removed from the subscriber.
+
+#### Syntax
+
+```js title="JavaScript"
+addSegmentWithDuration(segmentNameWithDuration)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`segmentNameWithDuration`: object `{ name: string, duration: number }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var segmentNameWithDuration = {
+  name: 'mobiles',
+  duration: 1,
+};
+
+PushEngage.push(function () {
+  PushEngage.addSegmentWithDuration(segmentNameWithDuration)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Add a Subscriber to Segments with Duration
+
+This method enables adding the current subscriber to multiple segments for a specified duration in days. After this period, the segments will automatically be removed from the subscriber.
+
+#### Syntax
+
+```js title="JavaScript"
+addSegmentWithDuration(segmentNamesWithDuration)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`segmentNamesWithDuration`: object&#91;] `{ name: string, duration: number }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var segmentNamesWithDuration = [
+  { name: 'computers', duration: 1 },
+  { name: 'tablets', duration: 2 },
+];
+
+PushEngage.push(function () {
+  PushEngage.addSegmentWithDuration(segmentNamesWithDuration)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Remove a Subscriber from Segments
+
+This method enables the removal of the current subscriber from one or multiple segments.
+
+#### Syntax
+
+```js title="JavaScript"
+removeSegment(segmentName)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`segmentName`: string | string[]
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var segmentName = 'web-stories';
+
+PushEngage.push(function () {
+  PushEngage.removeSegment(segmentName)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```js title="JavaScript"
+var segmentNames = ['politics', 'matermonial'];
+
+PushEngage.push(function () {
+  PushEngage.removeSegment(segmentNames)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Profile ID to Subscriber
+
+Profile IDs serve as unique identifiers for your subscribers, enabling you to recognize them across multiple devices and browsers. Each subscriber can be assigned just one profile ID. This ID should be a string, and you have the flexibility to use any value, such as an email or phone number.
+
+This method allows you to set a profile ID for the current subscriber. If a profile ID already exists, it will be replaced with the new value.
+
+#### Syntax
+
+```js title="JavaScript"
+setProfileId(profileId)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`profileId`: string
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var profileId = 'unique@email.com';
+
+PushEngage.push(function () {
+  PushEngage.setProfileId(profileId)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Attributes
+
+Attributes are key-value pairs that allow you to store additional information about your subscribers. You can use attributes to segment your subscribers and send personalized notifications. Each subscriber can have a maximum of 50 attributes. The key of an attribute can be up to 64 characters long, and the value can be up to 128 characters long in the case of a string.
+
+You first need to create attributes before using them. You can create them from the [PushEngage Dashboard](https://app.pushengage.com/audience/attributes).
+
+### Add Attributes to Subscriber
+
+Use this method to add or update attributes for a subscriber. If an attribute with the specified key already exists, the existing value will be replaced.
+
+#### Syntax
+
+```js title="JavaScript"
+addAttributes(attributes)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`attributes`: object `{ [key: string]: string | number | boolean }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var attributes = {
+  gender: 'female',
+  email: 'unique@email.com',
+};
+
+PushEngage.push(function () {
+  PushEngage.addAttributes(attributes)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Set Attributes for Subscriber
+
+This method allows you to set attributes for a subscriber, replacing any previously associated attributes. Use this method when you need to entirely reset the attributes with new values.
+
+#### Syntax
+
+```js title="JavaScript"
+setAttributes(attributes)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`attributes`: object `{ [key: string]: string | number | boolean }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var attributes = {
+  name: 'Jon smith',
+  isAdmin: true,
+};
+
+PushEngage.push(function () {
+  PushEngage.setAttributes(attributes)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Get Attributes for Subscriber
+
+Retrieve the attributes associated with the current subscriber using this method.
+
+#### Syntax
+
+```js title="JavaScript"
+getAttributes().then(successFunctionCallback).catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.getAttributes()
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "attribute_name": "<Attribute Value>"
+  ....
+  ....
+}
+```
+
+### Remove Attributes for Subscriber
+
+This method allows you to remove one or more attributes from the current subscriber. Provide an array of attribute names you wish to remove. If no keys are provided, it will result in the removal of all the subscriber's attributes.
+
+#### Syntax
+
+```js title="JavaScript"
+removeAttributes(attributeNames)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`attributeNames`: string[] (optional)
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var attributeNames = ['name'];
+
+PushEngage.push(function () {
+  PushEngage.removeAttributes(attributeNames)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Subscription Management Widget
+
+This widget allows subscribers to manage their subscription preferences, including [Segment Choices](#segments) and [Automated/personalized Notifications](#automatedpersonalized-notifications). It can be embedded on any page of your website as needed. Additionally, you can customize the widget's appearance and behavior either from the [PushEngage Dashboard](https://app.pushengage.com/design/widgets) or through the [Config Options](#config-options).
+
+### Show Subscription Management Widget
+
+This method triggers the display of the subscription management widget at the center of the current page. It's particularly useful if you want control over when the widget appears, such as through a custom button or link click. While the default behavior uses a bell design for subscription management.
+
+#### Syntax
+
+```js title="JavaScript"
+showSubscriptionManagementWidget()
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.showSubscriptionManagementWidget()
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+### Remove Subscription Management Widget
+
+This method removes the subscription management widget from the current page.
+
+#### Syntax
+
+```js title="JavaScript"
+removeSubscriptionManagementWidget()
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+PushEngage.push(function () {
+  PushEngage.removeSubscriptionManagementWidget()
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Identifying Subscribers
+
+This method allows you to identify subscribers using a unique identifier. The identifier can be an email, phone number, or any other value. This method is particularly useful for recognizing subscribers across multiple devices and browsers. This method accepts fixed keys, the details of which are listed below. If you want to use other keys, use the [attributes](#attributes) method.
+
+<Table data={sdkData.identifyProperties} />
+
+#### Syntax
+
+```js title="JavaScript"
+identify(subscriberFields)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`subscriberFields`: object `{ [key: string]: string | number | boolean }`
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var subscriberFields = {
+  first_name: 'John',
+  last_name: 'Doe',
+};
+
+PushEngage.push(function () {
+  PushEngage.identify(subscriberFields)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Logout
+
+This method allows you to delete the identifiers that were added through the [identifying subscribers](#identifying-subscribers) API. Provide an array of subscribed field names you wish to remove. If no field names are provided, it will result in the removal of the fields that store personal data, which are first_name, last_name, email, phone, gender, dob, and profile_id.
+
+#### Syntax
+
+```js title="JavaScript"
+logout(subscriberFieldNames)
+  .then(successFunctionCallback)
+  .catch(errorFunctionCallback);
+```
+
+#### Parameters
+
+`subscriberFieldNames`: string[] (optional)
+
+`sucessFunctionCallback`: function
+
+`errorFunctionCallback`: function
+
+#### Usage
+
+```js title="JavaScript"
+var subscriberFieldNames = ['first_name', 'last_name'];
+
+PushEngage.push(function () {
+  PushEngage.logout(subscriberFieldNames)
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error.message, error.details);
+    });
+});
+```
+
+```json title="Example of Success Response"
+{
+  "message": "<Response Message>"
+}
+```
+
+## Events
+
+These events allow you to listen to specific actions from the PushEngage SDK. Utilize these events to monitor subscription changes, track permission prompt actions (display, allow, or close), and observe interactions with notifications (display, click, or close).
+
+### Subscription Changed
+
+This event monitors changes in subscriptions. It's triggered either when a subscription is received for the first time or when there's a change in the existing subscription. The event details provide the subscriber ID or hash.
+
+This event is beneficial if you intend to store the subscriber ID or hash in your database for tasks such as sending personalized notifications.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.onSubscriptionChange', callbackFunction);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.onSubscriptionChange', function (event) {
+  console.log(event.detail);
+});
+```
+
+```json title="Example of Event Details Response"
+{
+  "subscriber_id": "<Subscriber ID/Hash>"
+}
+```
+
+### Permission Prompt Displayed
+
+Track when the permission prompt is displayed to the user using this event. It triggers when either the HTML popup modal or the native browser prompt is shown. The event details specify the prompt type (either 'html' or 'native') and the popup modal's name.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener(
+  'PushEngage.permissionPrompt.displayed',
+  callbackFunction,
+);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener(
+  'PushEngage.permissionPrompt.displayed',
+  function (event) {
+    console.log(event.detail);
+  },
+);
+```
+
+```json title="Example of Event Details Response"
+{
+  "prompt": "<native/html>",
+  "name": "<Popup Modal Name>"
+}
+```
+
+### Permission Prompt Allow
+
+This event tracks when a user grants permission through the prompt. It's activated when the 'Allow' button is clicked on either the HTML popup modal or the native browser prompt. The details outline the prompt type (either 'html' or 'native') and the popup modal's name.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.permissionPrompt.allow', callbackFunction);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.permissionPrompt.allow', function (event) {
+  console.log(event.detail);
+});
+```
+
+```json title="Example of Event Details Response"
+{
+  "prompt": "<native/html>",
+  "name": "<Popup Modal Name>"
+}
+```
+
+### Permission Prompt Close
+
+Utilize this event to track when the permission prompt is closed. It triggers when the 'Close' button is clicked on either the HTML popup modal or the native browser prompt. The details encapsulate the prompt type (either 'html' or 'native') and the popup modal's name.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.permissionPrompt.close', callbackFunction);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.permissionPrompt.close', function (event) {
+  console.log(event.detail);
+});
+```
+
+```json title="Example of Event Details Response"
+{
+  "prompt": "<native/html>",
+  "name": "<Popup Modal Name>"
+}
+```
+
+### Notification Displayed
+
+This event monitors when a notification is displayed to the user. The details provided include the notification's title.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.notification.displayed', callbackFunction);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.notification.displayed', function (event) {
+  console.log(event.detail);
+});
+```
+
+```json title="Example of Event Details Response"
+{
+  "title": "<Title of Notification>"
+}
+```
+
+### Notification Click
+
+This event monitors when a user clicks on a notification. The details provided include the notification's title.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.notification.click', callbackFunction);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.notification.click', function (event) {
+  console.log(event.detail);
+});
+```
+
+```json title="Example of Event Details Response"
+{
+  "title": "<Title of Notification>"
+}
+```
+
+### Notification Close
+
+This event monitors when a notification is closed by the user. The details provided include the notification's title.
+
+#### Syntax
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.notification.close', callbackFunction);
+```
+
+#### Parameters
+
+`callbackFunction`: function
+
+#### Usage
+
+```js title="JavaScript"
+window.addEventListener('PushEngage.notification.close', function (event) {
+  console.log(event.detail);
+});
+```
+
+```json title="Example of Event Details Response"
+{
+  "title": "<Title of Notification>"
+}
+```

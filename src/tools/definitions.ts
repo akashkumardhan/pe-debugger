@@ -339,18 +339,21 @@ const fetchPushEngageDocsOutputSchema = z.object({
 
 /**
  * Fetch and analyze PushEngage Web SDK documentation.
- * Scrapes content from https://pushengage.com/api/web-sdk/ and subpages.
- * Caches results for 24 hours to avoid repeated network requests.
+ * Parses embedded MDX documentation with table data.
  * AI responses must be grounded ONLY in the extracted documentation.
  */
 export const fetchPushEngageDocsDef = toolDefinition({
   name: 'fetch_pushengage_docs',
-  description: `Fetch PushEngage Web SDK documentation from https://pushengage.com/api/web-sdk/ and its subpages. 
-Use this tool to answer questions about PushEngage JavaScript API methods, parameters, code examples, and SDK usage.
-The tool scrapes documentation pages, extracts structured content (headings, API descriptions, parameters, code examples), 
-and returns relevant sections based on the query. Results are cached for 24 hours.
-IMPORTANT: All AI responses about PushEngage SDK must be based ONLY on the content returned by this tool.
-Do NOT use external knowledge or make assumptions beyond what is in the documentation.`,
+  description: `Search PushEngage Web SDK documentation for API methods, parameters, code examples, and usage guides.
+Use this tool to answer questions about PushEngage JavaScript SDK methods like addSegment, removeSegment, 
+addAttributes, subscribe, unsubscribe, showNativePermissionPrompt, and more.
+
+CRITICAL RULES:
+1. ONLY use information returned by this tool - do NOT use external knowledge or assumptions
+2. When returning code examples, copy the EXACT JavaScript code from the documentation - DO NOT modify, rewrite, or improve it
+3. Do NOT add your own code, comments, or explanations to the code examples
+4. Do NOT combine or merge code examples - return them exactly as they appear in the docs
+5. If the docs don't have a specific code example, say "No code example found in documentation" instead of writing your own`,
   inputSchema: fetchPushEngageDocsInputSchema,
   outputSchema: fetchPushEngageDocsOutputSchema,
 });
