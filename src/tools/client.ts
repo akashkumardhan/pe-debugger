@@ -11,14 +11,14 @@
  */
 
 import {
-  getSubscriptionDetailsDef,
+  getAppConfigDef,
   scrapeWebsiteDef,
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,
   fetchPushEngageDocsDef,
-  type GetSubscriptionDetailsInput,
-  type GetSubscriptionDetailsOutput,
+  type GetAppConfigInput,
+  type GetAppConfigOutput,
   type ScrapeWebsiteInput,
   type ScrapeWebsiteOutput,
   type UpdateUIInput,
@@ -44,10 +44,10 @@ import {
 // ============================================================
 
 /**
- * Get PushEngage subscription details from stored config.
+ * Get PushEngage app config details from stored config.
  * The content script fetches this via PushEngage.getAppConfig()
  */
-async function getSubscriptionDetailsHandler(_input: GetSubscriptionDetailsInput): Promise<GetSubscriptionDetailsOutput> {
+async function getAppConfigHandler(_input: GetAppConfigInput): Promise<GetAppConfigOutput> {
   try {
     const { available, config } = await getPEStatus();
 
@@ -60,7 +60,7 @@ async function getSubscriptionDetailsHandler(_input: GetSubscriptionDetailsInput
       };
     }
 
-    const result: GetSubscriptionDetailsOutput = {
+    const result: GetAppConfigOutput = {
       success: true,
       available: true,
       // Cast config to any to handle type mismatch between PEAppConfig and schema
@@ -77,7 +77,7 @@ async function getSubscriptionDetailsHandler(_input: GetSubscriptionDetailsInput
   }
 }
 
-export const getSubscriptionDetailsClient = getSubscriptionDetailsDef.client(getSubscriptionDetailsHandler as any);
+export const getAppConfigClient = getAppConfigDef.client(getAppConfigHandler as any);
 
 // ============================================================
 // SCRAPE WEBSITE - Client Implementation
@@ -409,7 +409,7 @@ export const fetchPushEngageDocsClient = fetchPushEngageDocsDef.client(fetchPush
  * All client-side tool implementations ready for use with chat()
  */
 export const clientTools = [
-  getSubscriptionDetailsClient,
+  getAppConfigClient,
   scrapeWebsiteClient,
   updateUIClient,
   saveToStorageClient,
@@ -418,7 +418,7 @@ export const clientTools = [
 ];
 
 export {
-  getSubscriptionDetailsClient as getSubscriptionDetails,
+  getAppConfigClient as getAppConfig,
   scrapeWebsiteClient as scrapeWebsite,
   updateUIClient as updateUI,
   saveToStorageClient as saveToStorage,

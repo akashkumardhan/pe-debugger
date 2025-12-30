@@ -22,7 +22,7 @@ import {
 // GET SUBSCRIPTION DETAILS TOOL
 // ============================================================
 
-const getSubscriptionDetailsInputSchema = z.object({
+const getAppConfigInputSchema = z.object({
   includeSettings: z.boolean()
     .optional()
     .default(true)
@@ -33,7 +33,7 @@ const getSubscriptionDetailsInputSchema = z.object({
     .describe('Whether to include campaign details in the response'),
 });
 
-const getSubscriptionDetailsOutputSchema = z.object({
+const getAppConfigOutputSchema = z.object({
   success: z.boolean(),
   available: z.boolean().describe('Whether PushEngage SDK is available on the page'),
   data: z.object({
@@ -82,18 +82,18 @@ const getSubscriptionDetailsOutputSchema = z.object({
 });
 
 /**
- * Get PushEngage subscription details from the current page.
+ * Get PushEngage app config details from the current page.
  * Uses PushEngage.getAppConfig() to retrieve configuration.
  */
-export const getSubscriptionDetailsDef = toolDefinition({
+export const getAppConfigDef = toolDefinition({
   name: 'get_subscription_details',
   description: 'Get PushEngage subscription and configuration details from the current webpage. Returns campaign info, site settings, segments, and more.',
-  inputSchema: getSubscriptionDetailsInputSchema,
-  outputSchema: getSubscriptionDetailsOutputSchema,
+  inputSchema: getAppConfigInputSchema,
+  outputSchema: getAppConfigOutputSchema,
 });
 
-export type GetSubscriptionDetailsInput = z.infer<typeof getSubscriptionDetailsInputSchema>;
-export type GetSubscriptionDetailsOutput = z.infer<typeof getSubscriptionDetailsOutputSchema>;
+export type GetAppConfigInput = z.infer<typeof getAppConfigInputSchema>;
+export type GetAppConfigOutput = z.infer<typeof getAppConfigOutputSchema>;
 
 // ============================================================
 // SCRAPE WEBSITE TOOL
@@ -366,7 +366,7 @@ export type FetchPushEngageDocsOutput = z.infer<typeof fetchPushEngageDocsOutput
 // ============================================================
 
 export const allToolDefinitions = [
-  getSubscriptionDetailsDef,
+  getAppConfigDef,
   scrapeWebsiteDef,
   updateUIDef,
   saveToStorageDef,
