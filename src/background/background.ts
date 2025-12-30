@@ -40,17 +40,22 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // ===== WEB NAVIGATION LISTENER =====
-// Clear errors when page navigates or refreshes (backup to content script session)
+// Clear all logs when page navigates or refreshes (backup to content script session)
 chrome.webNavigation.onCommitted.addListener(async (details) => {
   // Only handle main frame navigation (not iframes)
   if (details.frameId !== 0) return;
   
   const tabId = details.tabId;
   
-  // Clear errors for this tab on navigation/refresh
+  // Clear all logs for this tab on navigation/refresh
   // This ensures a fresh start for each page load
-  console.log(`DevDebug: Navigation detected for tab ${tabId}, clearing errors`);
-  await clearErrors(tabId);
+  console.log(`DevDebug: Navigation detected for tab ${tabId}, clearing all logs`);
+  
+  // Clear both errors and PE logs
+  await Promise.all([
+    clearErrors(tabId),
+    clearPELogs(tabId)
+  ]);
   
   // Clear the session for this tab (will be set by content script)
   tabSessions.delete(tabId);
