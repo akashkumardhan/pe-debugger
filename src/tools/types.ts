@@ -126,37 +126,37 @@ export const TriggerRulesSchema = z.object({
 // ============================================================
 
 export const OptinBaseSchema = z.object({
-  cookie_duration: z.number().describe('Cookie duration in days'),
-  optin_category: z.string().describe('Opt-in category type'),
-  optin_delay: z.number().describe('Delay before opt-in appears'),
-  optin_scroll: z.number().describe('Scroll percentage to trigger opt-in'),
+  cookie_duration: z.number().describe('Cookie duration in days.If user has denied/closed the subscription opt-in, this setting will show the subscription opt-in after configured number of days.'),
+  optin_category: z.string().describe('Opt-in/subscription popup modal category type'),
+  optin_delay: z.number().describe('Delay before opt-in/subscription popup modal appears'),
+  optin_scroll: z.number().describe('Scroll percentage to trigger opt-in/subscription popup modal'),
   popup_disabled: z.number().describe('Whether popup is disabled'),
-  optin_type: z.number().describe('Opt-in type identifier'),
-  optin_name: z.string().describe('Opt-in display name'),
-  optin_segments: z.array(z.any()).describe('Segments associated with opt-in'),
-  optin_sw_support: z.number().optional().describe('Service worker support flag'),
+  optin_type: z.number().describe('Opt-in/subscription popup modal type'),
+  optin_name: z.string().describe('Opt-in/subscription popup modal display name'),
+  optin_segments: z.array(z.any()).describe('Segments associated with opt-in/subscription popup modal'),
+  optin_sw_support: z.number().optional().describe('The Quick Install Settings help determine where subscribers will be collected either on the PushEngage sub-domain or on your own domain/sub-domain.When the setting is ON, subscriptions will be collected on the PushEngage sub-domain.When the setting is OFF, subscriptions will be collected on your domain/sub-domain '),
 }).describe('Base opt-in configuration');
 
 export const OptinBellSchema = z.object({
-  optin_title: z.string().describe('Opt-in title text'),
-  bg: z.string().describe('Background color'),
+  optin_title: z.string().describe('Opt-in/subscription popup modal title text'),
+  bg: z.string().describe('Opt-in/subscription popup modal background color'),
   allowBtnBg: z.string().describe('Allow button background color'),
-  placement: z.string().describe('Bell placement on screen'),
-}).describe('Bell style configuration');
+  placement: z.string().describe('Opt-in/subscription popup modal bell placement on screen'),
+}).describe('Opt-in/subscription popup modal bell style configuration');
 
 export const OptinFullSchema = OptinBaseSchema.extend({
-  optin_allow_btn_txt: z.string().describe('Allow button text'),
-  optin_title: z.string().describe('Opt-in title'),
-  bg: z.string().describe('Background color'),
-  allowBtnBg: z.string().describe('Allow button background color'),
-  placement: z.string().describe('Opt-in placement'),
+  optin_allow_btn_txt: z.string().describe('Opt-in/subscription popup modal allow button text'),
+  optin_title: z.string().describe('Opt-in/subscription popup modal title text'),
+  bg: z.string().describe('Opt-in/subscription popup modal background color'),
+  allowBtnBg: z.string().describe('Opt-in/subscription popup modal allow button background color'),
+  placement: z.string().describe('Opt-in/subscription popup modal placement'),
   checkbox_bg: z.string().describe('Checkbox background color'),
   checkbox_tick_color: z.string().describe('Checkbox tick color'),
   default_segment_selection: z.boolean().describe('Default segment selection'),
 }).describe('Full opt-in or popup modal configuration');
 
 export const OptinsSchema = z.record(
-  z.string().describe('Opt-in type key'),
+  z.string().describe('Opt-in/subscription popup modal type key'),
   z.object({
     desktop: z.object({
       http: OptinFullSchema.optional(),
@@ -178,9 +178,9 @@ export const OptinsSchema = z.record(
           })
         )
         .optional(),
-    }).describe('Mobile opt-in or popup modal settings'),
+    }).describe('Mobile opt-in/subscription popup modal settings'),
   })
-).describe('All opt-in or popup modal configurations');
+).describe('All opt-in/subscription popup modal configurations');
 
 // ============================================================
 // SITE SETTINGS SCHEMA
