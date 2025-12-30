@@ -51,20 +51,34 @@ You have access to the following tools:
 - save_to_storage: Save data to browser storage
 - analyze_error: Analyze a captured console error
 
-## CRITICAL PUSHENGAGE CODE RULES (MUST FOLLOW):
+## 🚨 CRITICAL PUSHENGAGE CODE RULES - VIOLATIONS ARE UNACCEPTABLE 🚨
 
-1. **NEVER write PushEngage JavaScript code from memory.** ALL PushEngage code examples MUST come from the "fetch_pushengage_docs" tool.
+### ABSOLUTE RULE: NEVER WRITE PUSHENGAGE CODE FROM MEMORY
 
-2. **When users ask for PushEngage code examples, JavaScript API methods, SDK usage, or "how to" implement something with PushEngage:**
-   - ALWAYS use the "fetch_pushengage_docs" tool FIRST with a relevant query (e.g., "addSegment", "addToCart", "subscribe", "trigger")
-   - Copy the EXACT code from the documentation - do NOT modify, rewrite, or improve it
-   - If the tool returns no code example, say: "No code example found in PushEngage documentation for this specific use case."
+1. **ALL PushEngage JavaScript code MUST come from the "fetch_pushengage_docs" tool.**
+   - Before showing ANY PushEngage code, you MUST call "fetch_pushengage_docs" tool first
+   - If you haven't called the tool, you CANNOT provide PushEngage code
+   - This applies to initialization, SDK methods, event listeners, EVERYTHING
 
-3. **CORRECT CASING - This is mandatory:**
-   - Always use "PushEngage" (capital P, capital E) - NOT "pushengage", "pushEngage", or "Pushengage"
-   - Example: \`PushEngage.push(function() { ... })\` ✅
-   - Wrong: \`pushengage.push(function() { ... })\` ❌
+2. **FORBIDDEN CODE PATTERNS (NEVER USE - These are hallucinations from training data):**
+   - ❌ \`window._peq = window._peq || [];\` - WRONG, NOT IN DOCS
+   - ❌ \`window._peq.push(['init']);\` - WRONG, NOT IN DOCS
+   - ❌ \`_pe.push(...)\` - WRONG, NOT IN DOCS
+   - ❌ \`pushengage.push(...)\` - WRONG CASING
+   - ❌ Any PushEngage code you "remember" - IT'S LIKELY WRONG
 
+3. **CORRECT PATTERNS (From documentation ONLY):**
+   - ✅ \`PushEngage.push(function() { PushEngage.method() })\` - Wrapper pattern
+   - ✅ \`PushEngage.push(['init', { appId: '...' }])\` - Initialization
+   - ✅ Capital "PushEngage" always (capital P, capital E)
+
+4. **MANDATORY PROCEDURE FOR ANY PUSHENGAGE CODE REQUEST:**
+   - Step 1: STOP - Do not write code from memory
+   - Step 2: Call "fetch_pushengage_docs" with relevant query
+   - Step 3: Copy code EXACTLY from tool response - NO modifications
+   - Step 4: If no code found, say "No code example found in PushEngage documentation"
+
+5. **FOR SERVICE WORKER ERRORS:** Call fetch_pushengage_docs with query "service worker" or "init" to get correct setup code
 
 ## TOOL USAGE GUIDELINES:
 
@@ -102,11 +116,15 @@ ${selectedError.stack}
 3. **Code Example** - Show corrected code when applicable
 4. **Prevention Tips** - Suggest how to avoid this error in the future
 
-## IMPORTANT FOR PUSHENGAGE ERRORS:
-If this error is related to PushEngage (mentions PushEngage, pushengage, or PE SDK):
-- ALWAYS use "fetch_pushengage_docs" tool FIRST to get the correct code/API usage
-- Provide fixes using ONLY the code examples from the documentation
-- Remember: Always use "PushEngage" (capital P, capital E) in code
+## 🚨 CRITICAL FOR PUSHENGAGE-RELATED ERRORS:
+If this error mentions PushEngage, pushengage, service-worker, SDK, or PE:
+1. **DO NOT suggest code fixes from memory** - Your training data is outdated
+2. **MUST call "fetch_pushengage_docs" tool FIRST** with query like "service worker", "init", or the relevant method
+3. **ONLY use code from the tool response** - Copy exactly, no modifications
+4. **NEVER use these patterns** (they are WRONG):
+   - ❌ window._peq = window._peq || [];
+   - ❌ window._peq.push(['init']);
+5. **Correct casing**: Always "PushEngage" (capital P, capital E)
 
 Use markdown formatting for code blocks and be concise but thorough.`;
     } else {

@@ -331,15 +331,24 @@ const fetchPushEngageDocsOutputSchema = z.object({
 export const fetchPushEngageDocsDef = toolDefinition({
   name: 'fetch_pushengage_docs',
   description: `Search PushEngage Web SDK documentation for API methods, parameters, code examples, and usage guides.
-Use this tool to answer questions about PushEngage JavaScript SDK methods like addSegment, removeSegment, 
-addAttributes, subscribe, unsubscribe, showNativePermissionPrompt, and more.
+Use this tool BEFORE providing ANY PushEngage JavaScript code. This is MANDATORY.
+
+AVAILABLE TOPICS: init, service worker, addSegment, removeSegment, addAttributes, subscribe, unsubscribe, 
+showNativePermissionPrompt, showPermissionPrompt, getSubscriber, automatedNotification, identify, logout, events
 
 CRITICAL RULES:
-1. ONLY use information returned by this tool - do NOT use external knowledge or assumptions
-2. When returning code examples, copy the EXACT JavaScript code from the documentation - DO NOT modify, rewrite, or improve it
-3. Do NOT add your own code, comments, or explanations to the code examples
-4. Do NOT combine or merge code examples - return them exactly as they appear in the docs
-5. If the docs don't have a specific code example, say "No code example found in documentation" instead of writing your own`,
+1. MUST call this tool BEFORE showing any PushEngage code - no exceptions
+2. ONLY use code from this tool's response - do NOT use external knowledge
+3. Copy code EXACTLY as returned - do NOT modify, rewrite, or improve it
+4. If no code found, say "No code example found in PushEngage documentation"
+
+FORBIDDEN PATTERNS (hallucinations from training data - NEVER USE):
+- window._peq = window._peq || [];
+- window._peq.push(['init']);
+- _pe.push(...)
+- pushengage.push(...) (wrong casing)
+
+CORRECT PATTERN: PushEngage.push(function() { PushEngage.methodName(...) })`,
   inputSchema: fetchPushEngageDocsInputSchema,
   outputSchema: fetchPushEngageDocsOutputSchema,
 });
