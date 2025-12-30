@@ -44,17 +44,17 @@ function buildSystemPrompt(
 ): string {
   const toolsDescription = `
 You have access to the following tools:
-- get_subscription_details: Get PushEngage subscription and configuration details from the current page
+- get_subscription_app_config: Get PushEngage subscription app configuration details from the current page
 - fetch_pushengage_docs: Search PushEngage Web SDK documentation for API methods, code examples, and usage guides
-- scrape_website: Scrape and extract content from a website URL
 - update_ui: Display notifications in the extension popup
 - save_to_storage: Save data to browser storage
 - analyze_error: Analyze a captured console error
 
 IMPORTANT TOOL USAGE GUIDELINES:
 - When users ask about PushEngage JavaScript API, SDK methods, code examples, or "how to" questions → Use "fetch_pushengage_docs" tool with a relevant query
-- When users ask about their specific PushEngage configuration, campaigns, settings → Use "get_subscription_details" tool
+- When users ask about their specific PushEngage configuration, campaigns, settings → Use "get_subscription_app_config" tool
 - Use tools proactively when they can help answer the question
+- When returning code examples from fetch_pushengage_docs, copy the EXACT code from the documentation - do NOT modify or rewrite it
 `;
 
   // Debug mode - with or without selected error
@@ -119,7 +119,7 @@ ${peContext}
 
 ## RESPONSE GUIDELINES:
 
-1. For questions about THIS SITE'S specific configuration/campaigns/settings → Answer from the data above OR use "get_subscription_details" tool
+1. For questions about THIS SITE'S specific configuration/campaigns/settings → Answer from the data above OR use "get_subscription_app_config" tool
 2. For questions about PushEngage JavaScript SDK/API methods, code examples, how to implement features → ALWAYS use "fetch_pushengage_docs" tool with a search query like "addSegment", "addToCart", "subscribe", etc.
 3. Be concise, accurate, and helpful
 4. Use markdown formatting for better readability

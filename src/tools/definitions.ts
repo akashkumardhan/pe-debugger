@@ -86,63 +86,14 @@ const getAppConfigOutputSchema = z.object({
  * Uses PushEngage.getAppConfig() to retrieve configuration.
  */
 export const getAppConfigDef = toolDefinition({
-  name: 'get_subscription_details',
-  description: 'Get PushEngage subscription and configuration details from the current webpage. Returns campaign info, site settings, segments, and more.',
+  name: 'get_subscription_app_config',
+  description: 'Get PushEngage subscription app config details from the current webpage. Returns campaign info, site settings, segments, and more.',
   inputSchema: getAppConfigInputSchema,
   outputSchema: getAppConfigOutputSchema,
 });
 
 export type GetAppConfigInput = z.infer<typeof getAppConfigInputSchema>;
 export type GetAppConfigOutput = z.infer<typeof getAppConfigOutputSchema>;
-
-// ============================================================
-// SCRAPE WEBSITE TOOL
-// ============================================================
-
-// Define schemas separately for proper type inference
-const scrapeWebsiteInputSchema = z.object({
-  url: z.url().describe('The URL to scrape'),
-  extractType: z.enum(['text', 'links', 'headings', 'all'])
-    .optional()
-    .default('all')
-    .describe('What type of content to extract'),
-  selector: z.string()
-    .optional()
-    .describe('Optional CSS selector to target specific content'),
-});
-
-const scrapeWebsiteOutputSchema = z.object({
-  success: z.boolean(),
-  url: z.string(),
-  title: z.string().optional(),
-  content: z.object({
-    text: z.string().optional(),
-    headings: z.array(z.object({
-      level: z.number(),
-      text: z.string(),
-    })).optional(),
-    links: z.array(z.object({
-      text: z.string(),
-      href: z.string(),
-    })).optional(),
-  }).optional(),
-  error: z.string().optional(),
-});
-
-/**
- * Scrape content from a website URL.
- * Useful for fetching documentation or external resources.
- */
-export const scrapeWebsiteDef = toolDefinition({
-  name: 'scrape_website',
-  description: 'Scrape and extract content from a website URL. Can extract text content, links, headings, and structured data.',
-  inputSchema: scrapeWebsiteInputSchema,
-  outputSchema: scrapeWebsiteOutputSchema,
-});
-
-// Export schema types directly for proper inference
-export type ScrapeWebsiteInput = z.infer<typeof scrapeWebsiteInputSchema>;
-export type ScrapeWebsiteOutput = z.infer<typeof scrapeWebsiteOutputSchema>;
 
 // ============================================================
 // UPDATE UI TOOL
@@ -367,7 +318,6 @@ export type FetchPushEngageDocsOutput = z.infer<typeof fetchPushEngageDocsOutput
 
 export const allToolDefinitions = [
   getAppConfigDef,
-  scrapeWebsiteDef,
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,

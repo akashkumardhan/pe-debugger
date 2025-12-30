@@ -12,15 +12,12 @@
 
 import {
   getAppConfigDef,
-  scrapeWebsiteDef,
   updateUIDef,
   saveToStorageDef,
   analyzeErrorDef,
   fetchPushEngageDocsDef,
   type GetAppConfigInput,
   type GetAppConfigOutput,
-  type ScrapeWebsiteInput,
-  type ScrapeWebsiteOutput,
   type UpdateUIInput,
   type UpdateUIOutput,
   type SaveToStorageInput,
@@ -78,105 +75,6 @@ async function getAppConfigHandler(_input: GetAppConfigInput): Promise<GetAppCon
 }
 
 export const getAppConfigClient = getAppConfigDef.client(getAppConfigHandler as any);
-
-// ============================================================
-// SCRAPE WEBSITE - Client Implementation
-// ============================================================
-
-/**
- * Scrape content from a website URL.
- * Uses fetch API to retrieve page content.
- */
-async function scrapeWebsiteHandler(input: ScrapeWebsiteInput): Promise<ScrapeWebsiteOutput> {
-  try {
-    // Fetch the webpage
-    const response = await fetch(input.url, {
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-    });
-
-    if (!response.ok) {
-      return {
-        success: false,
-        url: input.url,
-        error: `HTTP ${response.status}: ${response.statusText}`,
-      };
-    }
-
-    const html = await response.text();
-    
-    // Parse HTML using DOMParser
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    // Get title
-    const title = doc.querySelector('title')?.textContent || undefined;
-
-    // Apply selector if provided
-    const targetElement = input.selector 
-      ? doc.querySelector(input.selector) 
-      : doc.body;
-
-    if (!targetElement) {
-      return {
-        success: false,
-        url: input.url,
-        title,
-        error: `Selector "${input.selector}" not found`,
-      };
-    }
-
-    const content: {
-      text?: string;
-      headings?: Array<{ level: number; text: string }>;
-      links?: Array<{ text: string; href: string }>;
-    } = {};
-
-    // Extract based on type
-    if (input.extractType === 'text' || input.extractType === 'all') {
-      // Get text content, clean up whitespace
-      content.text = targetElement.textContent
-        ?.replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 10000) || ''; // Limit to 10k chars
-    }
-
-    if (input.extractType === 'headings' || input.extractType === 'all') {
-      const headingElements = targetElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
-      content.headings = Array.from(headingElements).map((h: Element) => ({
-        level: parseInt(h.tagName[1], 10),
-        text: h.textContent?.trim() || '',
-      })).slice(0, 50); // Limit to 50 headings
-    }
-
-    if (input.extractType === 'links' || input.extractType === 'all') {
-      const linkElements = targetElement.querySelectorAll('a[href]');
-      content.links = Array.from(linkElements)
-        .map((a: Element) => ({
-          text: a.textContent?.trim() || '',
-          href: (a as HTMLAnchorElement).href,
-        }))
-        .filter(l => l.text && l.href)
-        .slice(0, 100); // Limit to 100 links
-    }
-
-    return {
-      success: true,
-      url: input.url,
-      title,
-      content,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      url: input.url,
-      error: error instanceof Error ? error.message : 'Failed to scrape website',
-    };
-  }
-}
-
-export const scrapeWebsiteClient = scrapeWebsiteDef.client(scrapeWebsiteHandler as any);
 
 // ============================================================
 // UPDATE UI - Client Implementation
@@ -410,7 +308,6 @@ export const fetchPushEngageDocsClient = fetchPushEngageDocsDef.client(fetchPush
  */
 export const clientTools = [
   getAppConfigClient,
-  scrapeWebsiteClient,
   updateUIClient,
   saveToStorageClient,
   analyzeErrorClient,
@@ -419,7 +316,6 @@ export const clientTools = [
 
 export {
   getAppConfigClient as getAppConfig,
-  scrapeWebsiteClient as scrapeWebsite,
   updateUIClient as updateUI,
   saveToStorageClient as saveToStorage,
   analyzeErrorClient as analyzeError,
