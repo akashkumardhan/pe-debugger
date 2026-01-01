@@ -17,6 +17,8 @@ import {
   SiteSchema,
   SiteSettingsSchema,
   SubscriberDetailsSchema,
+  ServiceWorkerInfoSchema,
+  ServiceWorkerComparisonSchema,
 } from './types';
 
 // ============================================================
@@ -357,6 +359,52 @@ export type FetchPushEngageDocsInput = z.infer<typeof fetchPushEngageDocsInputSc
 export type FetchPushEngageDocsOutput = z.infer<typeof fetchPushEngageDocsOutputSchema>;
 
 // ============================================================
+// GET SERVICE WORKER INFO TOOL
+// ============================================================
+
+const getServiceWorkerInfoInputSchema = z.object({
+  compareWithPushEngage: z.boolean()
+    .optional()
+    .default(true)
+    .describe('Whether to compare active SW with PushEngage expected path'),
+});
+
+const getServiceWorkerInfoOutputSchema = z.object({
+  success: z.boolean(),
+  
+  serviceWorker: ServiceWorkerInfoSchema
+    .describe('Information about the currently active service worker'),
+  
+  comparison: ServiceWorkerComparisonSchema
+    .optional()
+    .describe('Comparison result with PushEngage expected service worker path'),
+  
+  error: z.string().optional(),
+});
+
+/**
+ * Get information about the currently active service worker on the page.
+ * Optionally compares it with PushEngage's expected service worker path
+ * from the site configuration (siteSettings.service_worker.worker).
+ */
+export const getServiceWorkerInfoDef = toolDefinition({
+  name: 'get_service_worker_info',
+  description: `Get the currently active service worker details from the webpage and compare with PushEngage expected configuration.
+
+Use this tool to:
+- Check if a service worker is currently controlling the page
+- Verify if the active service worker matches PushEngage's expected path
+- Debug service worker registration issues for PushEngage integration
+
+Returns the active SW script URL, scope, state, and comparison result with PushEngage config.`,
+  inputSchema: getServiceWorkerInfoInputSchema,
+  outputSchema: getServiceWorkerInfoOutputSchema,
+});
+
+export type GetServiceWorkerInfoInput = z.infer<typeof getServiceWorkerInfoInputSchema>;
+export type GetServiceWorkerInfoOutput = z.infer<typeof getServiceWorkerInfoOutputSchema>;
+
+// ============================================================
 // EXPORT ALL DEFINITIONS
 // ============================================================
 
@@ -367,6 +415,7 @@ export const allToolDefinitions = [
   saveToStorageDef,
   analyzeErrorDef,
   fetchPushEngageDocsDef,
+  getServiceWorkerInfoDef,
 ];
 
 // Note: All Input/Output types are exported inline with their schema definitions above
@@ -387,4 +436,10 @@ export {
   DocParameterSchema,
   DocPageSchema,
   DocCacheSchema,
+} from './types';
+
+// Re-export service worker schemas
+export {
+  ServiceWorkerInfoSchema,
+  ServiceWorkerComparisonSchema,
 } from './types';

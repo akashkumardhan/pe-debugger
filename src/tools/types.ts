@@ -723,3 +723,72 @@ export type SubscriberData = z.infer<typeof SubscriberDataSchema>;
 export type SubscriberContainer = z.infer<typeof SubscriberContainerSchema>;
 export type SubscriberDetails = z.infer<typeof SubscriberDetailsSchema>;
 
+// ============================================================
+// SERVICE WORKER INFO SCHEMA
+// ============================================================
+
+/**
+ * Schema for active service worker information
+ */
+export const ServiceWorkerInfoSchema = z.object({
+  available: z
+    .boolean()
+    .describe('Whether a service worker is currently active/controlling the page'),
+
+  scriptUrl: z
+    .string()
+    .nullable()
+    .describe('Full URL of the active service worker script'),
+
+  scriptPath: z
+    .string()
+    .nullable()
+    .describe('Path portion of the service worker script URL (e.g., /service-worker.js)'),
+
+  scope: z
+    .string()
+    .nullable()
+    .describe('Scope of the service worker registration'),
+
+  state: z
+    .enum(['installing', 'installed', 'activating', 'activated', 'redundant', 'unknown'])
+    .nullable()
+    .describe('Current state of the service worker'),
+}).describe('Information about the active service worker on the current page');
+
+/**
+ * Schema for PushEngage service worker comparison result
+ */
+export const ServiceWorkerComparisonSchema = z.object({
+  matches: z
+    .boolean()
+    .describe('Whether the active service worker matches PushEngage expected path'),
+
+  activeScriptUrl: z
+    .string()
+    .nullable()
+    .describe('URL of the currently active service worker'),
+
+  activeScriptPath: z
+    .string()
+    .nullable()
+    .describe('Path of the currently active service worker'),
+
+  expectedPath: z
+    .string()
+    .nullable()
+    .describe('Expected service worker path from PushEngage config'),
+
+  matchType: z
+    .enum(['exact', 'path_match', 'contains', 'no_match', 'no_sw', 'no_config'])
+    .describe('Type of match found between active SW and expected path'),
+
+  reason: z
+    .string()
+    .describe('Human-readable explanation of the comparison result'),
+}).describe('Comparison between active service worker and PushEngage expected configuration');
+
+// Type exports for service worker schemas
+export type ServiceWorkerInfo = z.infer<typeof ServiceWorkerInfoSchema>;
+export type ServiceWorkerComparison = z.infer<typeof ServiceWorkerComparisonSchema>;
+

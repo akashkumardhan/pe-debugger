@@ -17,6 +17,7 @@ import {
   saveToStorageDef,
   analyzeErrorDef,
   fetchPushEngageDocsDef,
+  getServiceWorkerInfoDef,
   type GetAppConfigInput,
   type GetAppConfigOutput,
   type GetSubscriberDetailsInput,
@@ -29,8 +30,11 @@ import {
   type AnalyzeErrorOutput,
   type FetchPushEngageDocsInput,
   type FetchPushEngageDocsOutput,
+  type GetServiceWorkerInfoInput,
+  type GetServiceWorkerInfoOutput,
 } from './definitions';
-import { getPEStatus, getPESubscriberDetails, getErrors } from '../utils/storage';
+import { getPEStatus, getPESubscriberDetails, getErrors, getServiceWorkerInfo as getServiceWorkerInfoFromStorage } from '../utils/storage';
+import type { ServiceWorkerComparison } from './types';
 import { 
   searchDocumentation, 
   formatSectionsForAI, 
@@ -342,6 +346,156 @@ async function fetchPushEngageDocsHandler(input: FetchPushEngageDocsInput): Prom
 export const fetchPushEngageDocsClient = fetchPushEngageDocsDef.client(fetchPushEngageDocsHandler as any);
 
 // ============================================================
+// GET SERVICE WORKER INFO - Client Implementation
+// ============================================================
+
+/**
+ * Compare the active service worker path with PushEngage expected path
+ */
+function compareServiceWorkerPaths(
+  activeScriptUrl: string | null,
+  activeScriptPath: string | null,
+  expectedPath: string | null
+): ServiceWorkerComparison {
+  // No active service worker
+  if (!activeScriptUrl || !activeScriptPath) {
+    return {
+      matches: false,
+      activeScriptUrl: null,
+      activeScriptPath: null,
+      expectedPath,
+      matchType: 'no_sw',
+      reason: 'No active service worker found on this page',
+    };
+  }
+
+  // No PushEngage config (no expected path)
+  if (!expectedPath) {
+    return {
+      matches: false,
+      activeScriptUrl,
+      activeScriptPath,
+      expectedPath: null,
+      matchType: 'no_config',
+      reason: 'PushEngage configuration not available - cannot determine expected service worker path',
+    };
+  }
+
+  // Normalize paths for comparison
+  const normalizedActive = activeScriptPath.replace(/^\/+/, '').replace(/\/+$/, '');
+  const normalizedExpected = expectedPath.replace(/^\/+/, '').replace(/\/+$/, '');
+
+  // Check for exact match
+  if (normalizedActive === normalizedExpected) {
+    return {
+      matches: true,
+      activeScriptUrl,
+      activeScriptPath,
+      expectedPath,
+      matchType: 'exact',
+      reason: `Service worker path matches exactly: ${activeScriptPath}`,
+    };
+  }
+
+  // Check if active path ends with expected path (e.g., /subfolder/service-worker.js matches service-worker.js)
+  if (normalizedActive.endsWith(normalizedExpected)) {
+    return {
+      matches: true,
+      activeScriptUrl,
+      activeScriptPath,
+      expectedPath,
+      matchType: 'path_match',
+      reason: `Service worker path matches (active path ends with expected): ${activeScriptPath} contains ${expectedPath}`,
+    };
+  }
+
+  // Check if the expected path is contained within the active path filename
+  const activeFilename = normalizedActive.split('/').pop() || '';
+  const expectedFilename = normalizedExpected.split('/').pop() || '';
+  
+  if (activeFilename === expectedFilename) {
+    return {
+      matches: true,
+      activeScriptUrl,
+      activeScriptPath,
+      expectedPath,
+      matchType: 'contains',
+      reason: `Service worker filename matches: ${activeFilename}`,
+    };
+  }
+
+  // No match
+  return {
+    matches: false,
+    activeScriptUrl,
+    activeScriptPath,
+    expectedPath,
+    matchType: 'no_match',
+    reason: `Service worker path mismatch. Active: "${activeScriptPath}", Expected: "${expectedPath}"`,
+  };
+}
+
+/**
+ * Get service worker info and optionally compare with PushEngage config
+ */
+async function getServiceWorkerInfoHandler(input: GetServiceWorkerInfoInput): Promise<GetServiceWorkerInfoOutput> {
+  try {
+    // Get the active service worker info from storage
+    const { available, data: swInfo } = await getServiceWorkerInfoFromStorage();
+
+    // Build service worker info object
+    const serviceWorker = {
+      available,
+      scriptUrl: swInfo?.scriptUrl || null,
+      scriptPath: swInfo?.scriptPath || null,
+      scope: swInfo?.scope || null,
+      state: swInfo?.state || null,
+    };
+
+    // If comparison not requested, return just the SW info
+    if (!input.compareWithPushEngage) {
+      return {
+        success: true,
+        serviceWorker,
+      };
+    }
+
+    // Get PushEngage config for comparison
+    const { config: peConfig } = await getPEStatus();
+    
+    // Extract expected service worker path from PE config
+    const expectedPath = peConfig?.siteSettings?.service_worker?.worker || null;
+
+    // Perform comparison
+    const comparison = compareServiceWorkerPaths(
+      serviceWorker.scriptUrl,
+      serviceWorker.scriptPath,
+      expectedPath
+    );
+
+    return {
+      success: true,
+      serviceWorker,
+      comparison,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      serviceWorker: {
+        available: false,
+        scriptUrl: null,
+        scriptPath: null,
+        scope: null,
+        state: null,
+      },
+      error: error instanceof Error ? error.message : 'Failed to get service worker info',
+    };
+  }
+}
+
+export const getServiceWorkerInfoClient = getServiceWorkerInfoDef.client(getServiceWorkerInfoHandler as any);
+
+// ============================================================
 // EXPORT ALL CLIENT TOOLS
 // ============================================================
 
@@ -355,6 +509,7 @@ export const clientTools = [
   saveToStorageClient,
   analyzeErrorClient,
   fetchPushEngageDocsClient,
+  getServiceWorkerInfoClient,
 ];
 
 export {
@@ -364,5 +519,6 @@ export {
   saveToStorageClient as saveToStorage,
   analyzeErrorClient as analyzeError,
   fetchPushEngageDocsClient as fetchPushEngageDocs,
+  getServiceWorkerInfoClient as getServiceWorkerInfo,
 };
 

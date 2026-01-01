@@ -3,7 +3,7 @@
 
 interface DevDebugMessage {
   source: 'devdebug-ai';
-  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'PAGE_SESSION_START' | 'PE_LOG' | 'PE_DEBUG_STATUS';
+  type: 'CONSOLE_ERROR' | 'PE_DETECTION' | 'PE_CONFIG' | 'PE_SUBSCRIBER_DETAILS' | 'PAGE_SESSION_START' | 'PE_LOG' | 'PE_DEBUG_STATUS' | 'SERVICE_WORKER_INFO';
   error?: unknown;
   log?: unknown;
   hasPushEngage?: boolean;
@@ -35,6 +35,7 @@ window.addEventListener('message', (event) => {
       config: data.config,
       available: data.available,
       subscriberDetails: data.data,
+      serviceWorkerInfo: data.data, // Used for SERVICE_WORKER_INFO type
       sessionId: data.sessionId
     }).catch(() => {
       // Extension context may be invalidated, ignore

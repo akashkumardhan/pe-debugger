@@ -1,6 +1,6 @@
 // Chrome Storage Utilities
 import type { ConsoleError, ApiConfig, PEAppConfig, PESubscriberDetails, PELog } from '../types';
-import type { DocCache } from '../tools/types';
+import type { DocCache, ServiceWorkerInfo } from '../tools/types';
 
 // ===== CONSTANTS =====
 const PE_DOCS_CACHE_KEY = 'pe_docs_cache';
@@ -206,6 +206,20 @@ export function exportPESubscriberDetailsAsJSON(data: PESubscriberDetails): void
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ===== SERVICE WORKER INFO =====
+
+/**
+ * Get the currently active service worker info from the page
+ */
+export async function getServiceWorkerInfo(): Promise<{ available: boolean; data: ServiceWorkerInfo | null }> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_SERVICE_WORKER_INFO' });
+    return response || { available: false, data: null };
+  } catch {
+    return { available: false, data: null };
+  }
 }
 
 // ===== PRIVACY SETTINGS =====

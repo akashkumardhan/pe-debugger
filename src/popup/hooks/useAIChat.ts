@@ -46,6 +46,7 @@ function buildSystemPrompt(
 You have access to the following tools:
 - get_subscription_app_config: Get PushEngage subscription app configuration details from the current page (campaigns, site settings, segments, opt-in configuration)
 - get_subscription_details: Get PushEngage subscription details from the current page, including isSubDomain, appId, subscriber id, isSubscribed, endpoint, and subscriber details like expiresAt, city, country, device, browser type, subscription URL, timezone, segments, and trigger status
+- get_service_worker_info: Get the currently active service worker details and compare with PushEngage expected configuration. Use this to verify if the correct service worker is installed for PushEngage integration.
 - fetch_pushengage_docs: Search PushEngage Web SDK documentation for API methods, code examples, and usage guides
 - update_ui: Display notifications in the extension popup
 - save_to_storage: Save data to browser storage
@@ -85,7 +86,15 @@ You have access to the following tools:
 - PushEngage JavaScript API, SDK methods, code examples, "how to" questions → Use "fetch_pushengage_docs" tool
 - Specific PushEngage configuration, campaigns, settings → Use "get_subscription_app_config" tool
 - Subscription status, subscriber ID, device info, location → Use "get_subscription_details" tool
+- Service worker issues, SW path verification, SW registration problems → Use "get_service_worker_info" tool
 - Use tools proactively when they can help answer the question
+
+## SERVICE WORKER DEBUGGING:
+When users ask about service worker issues or PushEngage not working:
+1. Use "get_service_worker_info" to check if the correct SW is installed
+2. The tool compares active SW path with PushEngage expected path (from siteSettings.service_worker.worker)
+3. If paths don't match, guide user to install correct service worker
+4. Use "fetch_pushengage_docs" with query "service worker" for installation instructions
 `;
 
   // Debug mode - with or without selected error

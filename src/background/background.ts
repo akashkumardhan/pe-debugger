@@ -1,8 +1,8 @@
 // DevDebug AI - Background Service Worker
 import type { ConsoleError, PEAppConfig, PELog } from '../types';
 
-// Import subscriber details type
-import type { SubscriberDetails } from '../tools/types';
+// Import subscriber details and service worker types
+import type { SubscriberDetails, ServiceWorkerInfo } from '../tools/types';
 
 // Storage data interface for reference (used implicitly via chrome.storage)
 export type StorageData = {
@@ -15,6 +15,7 @@ export type StorageData = {
   peSubscriberDetails: SubscriberDetails | null;
   peSubscriberAvailable: boolean;
   tabSessions: Record<number, number>; // tabId -> sessionId mapping
+  serviceWorkerInfo: ServiceWorkerInfo | null; // Active service worker info
 };
 
 const MAX_ERRORS = 50;
@@ -34,7 +35,8 @@ chrome.runtime.onInstalled.addListener(() => {
     peDebugTabs: {},
     peSubscriberDetails: null,
     peSubscriberAvailable: false,
-    tabSessions: {}
+    tabSessions: {},
+    serviceWorkerInfo: null
   });
   console.log('DevDebug AI installed');
 });
@@ -110,6 +112,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'GET_PE_SUBSCRIBER':
       getPESubscriberDetails(message.tabId || tabId).then(sendResponse);
+      return true;
+
+    case 'SERVICE_WORKER_INFO':
+      handleServiceWorkerInfo(message.serviceWorkerInfo, tabId);
+      break;
+
+    case 'GET_SERVICE_WORKER_INFO':
+      getServiceWorkerInfo().then(sendResponse);
       return true;
 
     case 'GET_ERRORS':
@@ -435,6 +445,36 @@ async function getPESubscriberDetails(_tabId?: number): Promise<{ available: boo
     };
     
     return { available: peSubscriberAvailable, data: peSubscriberDetails };
+  } catch {
+    return { available: false, data: null };
+  }
+}
+
+// ===== SERVICE WORKER INFO =====
+
+// Handle service worker info from content script
+async function handleServiceWorkerInfo(
+  swInfo: ServiceWorkerInfo | null,
+  _tabId?: number
+): Promise<void> {
+  try {
+    await chrome.storage.local.set({ serviceWorkerInfo: swInfo });
+  } catch (err) {
+    console.error('DevDebug: Failed to store service worker info:', err);
+  }
+}
+
+// Get service worker info
+async function getServiceWorkerInfo(): Promise<{ available: boolean; data: ServiceWorkerInfo | null }> {
+  try {
+    const { serviceWorkerInfo = null } = await chrome.storage.local.get('serviceWorkerInfo') as {
+      serviceWorkerInfo: ServiceWorkerInfo | null;
+    };
+    
+    return { 
+      available: serviceWorkerInfo?.available || false, 
+      data: serviceWorkerInfo 
+    };
   } catch {
     return { available: false, data: null };
   }

@@ -47,6 +47,14 @@ interface PESubscriberDetails {
   };
 }
 
+interface ServiceWorkerInfo {
+  available: boolean;
+  scriptUrl: string | null;
+  scriptPath: string | null;
+  scope: string | null;
+  state: 'installing' | 'installed' | 'activating' | 'activated' | 'redundant' | 'unknown' | null;
+}
+
 (function() {
   'use strict';
 
@@ -393,6 +401,96 @@ interface PESubscriberDetails {
 
   // Periodic detection (every 5 seconds)
   setInterval(detectPushEngage, 5000);
+
+  // ===== SERVICE WORKER DETECTION =====
+  /**
+   * Get information about the currently active service worker
+   */
+  async function getServiceWorkerInfo(): Promise<ServiceWorkerInfo> {
+    const noSW: ServiceWorkerInfo = {
+      available: false,
+      scriptUrl: null,
+      scriptPath: null,
+      scope: null,
+      state: null,
+    };
+
+    // Check if Service Worker API is available
+    if (!('serviceWorker' in navigator)) {
+      return noSW;
+    }
+
+    try {
+      // Method 1: Check for controlling service worker (most reliable for active SW)
+      if (navigator.serviceWorker.controller) {
+        const controller = navigator.serviceWorker.controller;
+        const scriptUrl = controller.scriptURL;
+        const scriptPath = new URL(scriptUrl).pathname;
+        
+        return {
+          available: true,
+          scriptUrl,
+          scriptPath,
+          scope: null, // Controller doesn't expose scope directly
+          state: controller.state as ServiceWorkerInfo['state'] || 'unknown',
+        };
+      }
+
+      // Method 2: Get registration to find scope and waiting/active SW
+      const registration = await navigator.serviceWorker.getRegistration();
+      
+      if (registration) {
+        // Prefer active, then waiting, then installing
+        const sw = registration.active || registration.waiting || registration.installing;
+        
+        if (sw) {
+          const scriptUrl = sw.scriptURL;
+          const scriptPath = new URL(scriptUrl).pathname;
+          
+          return {
+            available: true,
+            scriptUrl,
+            scriptPath,
+            scope: registration.scope,
+            state: sw.state as ServiceWorkerInfo['state'] || 'unknown',
+          };
+        }
+        
+        // Registration exists but no SW (shouldn't happen, but handle it)
+        return {
+          available: false,
+          scriptUrl: null,
+          scriptPath: null,
+          scope: registration.scope,
+          state: null,
+        };
+      }
+
+      return noSW;
+    } catch (err) {
+      console.warn('DevDebug: Error getting service worker info:', err);
+      return noSW;
+    }
+  }
+
+  /**
+   * Detect and send service worker info to extension
+   */
+  async function detectServiceWorker(): Promise<void> {
+    const swInfo = await getServiceWorkerInfo();
+    
+    window.postMessage({
+      source: 'devdebug-ai',
+      type: 'SERVICE_WORKER_INFO',
+      data: swInfo
+    }, '*');
+  }
+
+  // Initial SW detection (slightly delayed to ensure SW is registered)
+  setTimeout(detectServiceWorker, 1500);
+
+  // Periodic SW detection (every 10 seconds - SW changes are rare)
+  setInterval(detectServiceWorker, 10000);
 
   // Log initialization
   console.log('%c🔧 DevDebug AI initialized', 'color: #3B82F6; font-weight: bold;');
