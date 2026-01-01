@@ -161,6 +161,10 @@ ${activeOptinsFormatted}
 - **Subscription Analytics:** ${analytics?.enabled ? 'Enabled' : 'Disabled'}
 
 ### Service Worker Configuration
+> ⚠️ **IMPORTANT:** The Service Worker URL does NOT indicate Quick Install status.
+> Quick Install is determined by the "optin_sw_support" field in each opt-in configuration (see "Configured Opt-in/Popup Modals" section above).
+> For opt-in type 4 (single-step), Quick Install is NOT applicable - subscriptions are always collected on the user's domain.
+
 - **Worker URL:** ${serviceWorker?.worker || 'N/A'}
 - **Scope Enabled:** ${serviceWorker?.scope ? 'Yes' : 'No'}
 - **Worker Status:** ${serviceWorker?.workerStatus ? 'Enabled' : 'Disabled'}
@@ -296,6 +300,20 @@ ${resetPopup?.variants?.length ? resetPopup.variants.map((v: any) => `  • ${v.
       
       if (primaryConfig) {
         const activeStatus = isActiveHttps ? '✅ ACTIVE' : (isActiveHttp ? '✅ ACTIVE (HTTP)' : '❌ INACTIVE');
+        const optinTypeNum = parseInt(typeKey);
+        
+        // Quick Install (optin_sw_support) determination:
+        // - For opt-in type 4 (single-step): Quick Install is NOT applicable - always uses user's domain
+        // - For other types: optin_sw_support=1 means Quick Install ON (PushEngage subdomain), 0 means OFF (user's domain)
+        let quickInstallStatus: string;
+        if (optinTypeNum === 4) {
+          quickInstallStatus = 'N/A (Type 4 single-step opt-in always collects on your domain - Quick Install not applicable)';
+        } else if (primaryConfig.optin_sw_support === 1) {
+          quickInstallStatus = '✅ ON (Subscriptions collected on PushEngage subdomain). This is helpful if the site is HTTP because, HTTP sites are not allowed to collect subscriptions on your own domain. So, PushEngage gives option to collect subscriptions on PushEngage subdomain.';
+        } else {
+          quickInstallStatus = '❌ OFF (Subscriptions collected on your domain)';
+        }
+        
         lines.push(`
 **Opt-in Type ${typeKey}** [${activeStatus}]
 - **Opt-in Name:** "${primaryConfig.optin_name || 'Unnamed'}"
@@ -313,7 +331,7 @@ ${resetPopup?.variants?.length ? resetPopup.variants.map((v: any) => `  • ${v.
 - **Checkbox Tick Color:** ${primaryConfig.checkbox_tick_color || 'N/A'}
 - **Default Segment Selection:** ${primaryConfig.default_segment_selection ? 'Yes' : 'No'}
 - **Popup Disabled:** ${primaryConfig.popup_disabled ? 'Yes' : 'No'}
-// - **SW Support (Quick Install):** ${primaryConfig.optin_sw_support ? 'On (PushEngage subdomain)' : 'Off (This domain)'}
+- **Quick Install (optin_sw_support):** ${quickInstallStatus}
 - **Associated Segments:** ${primaryConfig.optin_segments?.length || 0}`);
       }
     }
