@@ -62,7 +62,7 @@ export interface PEOptinTypeConfig {
   optin_category: string;
   optin_delay: number;
   optin_scroll: number;
-  popup_disabled: number;
+  // popup_disabled: number;
   optin_type: number;
   optin_name: string;
   optin_sw_support: number;

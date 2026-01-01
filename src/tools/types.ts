@@ -129,7 +129,7 @@ export const OptinFullSchema = z.object({
   optin_category: z.string().describe('Opt-in/subscription popup modal category type'),
   optin_delay: z.number().describe('Delay before opt-in/subscription popup modal appears'),
   optin_scroll: z.number().describe('Scroll percentage to trigger opt-in/subscription popup modal'),
-  popup_disabled: z.number().describe('Whether popup is disabled'),
+  // popup_disabled: z.number().describe('Whether popup is disabled'),
   optin_type: z.number().describe('Opt-in/subscription popup modal type'),
   optin_name: z.string().describe('Name of the opt-in/subscription popup modal'),
   optin_segments: z.array(z.any()).describe('Segments associated with opt-in/subscription popup modal'),
@@ -202,12 +202,12 @@ export const SiteSettingsSchema = z.object({
       })
     )
     .describe(
-      'URL-based include rules that determine where the opt-in should be shown'
+      'URL-based include rules that determine in which pages the opt-in should be shown'
     ),
     include_countries: z
       .array(z.string())
       .describe('Countries where opt-in is enabled'),
-  }).describe('Targeting Rule, By default, the subscription opt-in will be shown across all pages. Setup the global targeting rule for your opt-ins here. The global targeting rules will have a higher preference over the individual opt-in subscription rule'),
+  }).describe('Targeting Rule, By default, the subscription opt-in will be shown across all pages. Setup the global targeting rule for your opt-ins here. The global targeting rules will have a higher preference over the individual opt-in subscription rule. If this setting is enabled then the popup will come if it satisfies the targeting rule.'),
 
 
   // Opt-in settings

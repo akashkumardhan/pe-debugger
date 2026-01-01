@@ -150,9 +150,15 @@ ${formatCampaignList(config.customTriggerCampaigns || [], 'Custom Triggers')}
 #### Configured Opt-in/Popup Modals (with names)
 ${activeOptinsFormatted}
 
-### Targeting Rules (Opt-in Management Settings)
-- **Include Rules:** ${optinManagement?.include?.length ? optinManagement.include.map((r: any) => `${r.rule}: "${r.value}"`).join(', ') : 'None configured'}
-- **Include Countries:** ${optinManagement?.include_countries?.length ? optinManagement.include_countries.join(', ') : 'All countries'}
+### 🚨 POPUP VISIBILITY BLOCKERS - CHECK ALL OF THESE!
+
+#### 1. URL TARGETING RULES (optin_management_settings.include)
+> ⚠️ If targeting rules are configured, popup ONLY appears on pages matching these rules!
+
+${this.formatTargetingRules(optinManagement)}
+
+#### 2. GEO TARGETING (include_countries)
+- **Country Restriction:** ${optinManagement?.include_countries?.length ? '🔴 YES - Only: ' + optinManagement.include_countries.join(', ') : '🟢 NO (all countries allowed)'}
 
 ### Privacy Settings
 - **Geo Location Enabled:** ${privacy?.geoLocationEnabled ? 'Yes' : 'No'}
@@ -270,6 +276,56 @@ ${resetPopup?.variants?.length ? resetPopup.variants.map((v: any) => `  • ${v.
   }
 
   /**
+   * Format targeting rules - handles both array format and object format
+   */
+  private formatTargetingRules(optinManagement: any): string {
+    if (!optinManagement?.include) {
+      return `- **Targeting Rules Enabled:** 🟢 NO (popup can show on all pages)\n  • None configured`;
+    }
+
+    const include = optinManagement.include;
+    const rules: string[] = [];
+    let totalRules = 0;
+
+    if (Array.isArray(include)) {
+      // Array format: [{id, rule, value}]
+      totalRules = include.length;
+      include.forEach((r: any) => {
+        const explanation = r.rule === 'start' ? 'URL must START with' : r.rule === 'contains' ? 'URL must CONTAIN' : 'URL must EXACTLY match';
+        rules.push(`  • **${r.rule.toUpperCase()}:** "${r.value}" → ${explanation} this value`);
+      });
+    } else if (typeof include === 'object') {
+      // Object format: {start:[], exact:[], contains:[]}
+      const includeObj = include as { start?: string[]; exact?: string[]; contains?: string[] };
+      
+      if (includeObj.start?.length) {
+        totalRules += includeObj.start.length;
+        includeObj.start.forEach((url: string) => {
+          rules.push(`  • **START:** "${url}" → URL must START with this value`);
+        });
+      }
+      if (includeObj.exact?.length) {
+        totalRules += includeObj.exact.length;
+        includeObj.exact.forEach((url: string) => {
+          rules.push(`  • **EXACT:** "${url}" → URL must EXACTLY match this value`);
+        });
+      }
+      if (includeObj.contains?.length) {
+        totalRules += includeObj.contains.length;
+        includeObj.contains.forEach((url: string) => {
+          rules.push(`  • **CONTAINS:** "${url}" → URL must CONTAIN this value`);
+        });
+      }
+    }
+
+    if (totalRules > 0) {
+      return `- **Targeting Rules Enabled:** 🔴 YES (${totalRules} rule${totalRules > 1 ? 's' : ''}) - POPUP RESTRICTED TO SPECIFIC URLS!\n${rules.join('\n')}`;
+    } else {
+      return `- **Targeting Rules Enabled:** 🟢 NO (popup can show on all pages)\n  • None configured`;
+    }
+  }
+
+  /**
    * Format active opt-ins with full configuration details including optin_name
    */
   private formatActiveOptins(settings: any): string {
@@ -314,6 +370,7 @@ ${resetPopup?.variants?.length ? resetPopup.variants.map((v: any) => `  • ${v.
           quickInstallStatus = '❌ OFF (Subscriptions collected on your domain)';
         }
         
+
         lines.push(`
 **Opt-in Type ${typeKey}** [${activeStatus}]
 - **Opt-in Name:** "${primaryConfig.optin_name || 'Unnamed'}"
@@ -321,16 +378,15 @@ ${resetPopup?.variants?.length ? resetPopup.variants.map((v: any) => `  • ${v.
 - **Opt-in Title:** "${primaryConfig.optin_title || 'N/A'}"
 - **Category:** ${primaryConfig.optin_category || 'N/A'}
 - **Placement:** ${primaryConfig.placement || 'N/A'}
-- **Delay:** ${primaryConfig.optin_delay || 0} seconds
-- **Scroll Trigger:** ${primaryConfig.optin_scroll || 0}%
-- **Cookie Duration:** ${primaryConfig.cookie_duration || 0} days
+- **Delay:** ${primaryConfig.optin_delay || 0} seconds (popup waits this long before showing)
+- **Scroll Trigger:** ${primaryConfig.optin_scroll || 0}% (popup waits for this scroll percentage)
+- **Cookie Duration:** ${primaryConfig.cookie_duration || 0} days (if dismissed, wait this many days)
 - **Allow Button Text:** "${primaryConfig.optin_allow_btn_txt || 'N/A'}"
 - **Background Color:** ${primaryConfig.bg || 'N/A'}
 - **Allow Button Background:** ${primaryConfig.allowBtnBg || 'N/A'}
 - **Checkbox Background:** ${primaryConfig.checkbox_bg || 'N/A'}
 - **Checkbox Tick Color:** ${primaryConfig.checkbox_tick_color || 'N/A'}
 - **Default Segment Selection:** ${primaryConfig.default_segment_selection ? 'Yes' : 'No'}
-- **Popup Disabled:** ${primaryConfig.popup_disabled ? 'Yes' : 'No'}
 - **Quick Install (optin_sw_support):** ${quickInstallStatus}
 - **Associated Segments:** ${primaryConfig.optin_segments?.length || 0}`);
       }
