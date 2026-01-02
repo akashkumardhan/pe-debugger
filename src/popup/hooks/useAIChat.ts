@@ -95,6 +95,7 @@ When users ask about service worker issues or PushEngage not working:
 2. The tool compares active SW path with PushEngage expected path (from siteSettings.service_worker.worker)
 3. If paths don't match, guide user to install correct service worker
 4. Use "fetch_pushengage_docs" with query "service worker" for installation instructions
+5. For 403/404 service worker errors, refer users to: https://www.pushengage.com/documentation/404-403-service-worker-installation-error/
 `;
 
   // Debug mode - with or without selected error
