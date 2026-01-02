@@ -15,6 +15,7 @@ import { createAdapter, type AIAdapter, type AdapterMessage } from '../../servic
 import { clientTools, registerUIUpdateCallback, unregisterUIUpdateCallback } from '../../tools/client';
 import { allToolDefinitions } from '../../tools/definitions';
 import { pushEngageService } from '../../services/pushEngage';
+import { PUSHENGAGE_DASHBOARD_DOCS, DASHBOARD_NAVIGATION_RULES } from '../../utils/dashboardDocs';
 
 interface UseAIChatOptions {
   apiConfig: ApiConfig | null;
@@ -93,9 +94,23 @@ You have access to the following tools:
 When users ask about service worker issues or PushEngage not working:
 1. Use "get_service_worker_info" to check if the correct SW is installed
 2. The tool compares active SW path with PushEngage expected path (from siteSettings.service_worker.worker)
-3. If paths don't match, guide user to install correct service worker
+3. If paths don't match, guide user to ensure the SW file exists at the configured path
 4. Use "fetch_pushengage_docs" with query "service worker" for installation instructions
 5. For 403/404 service worker errors, refer users to: https://www.pushengage.com/documentation/404-403-service-worker-installation-error/
+
+**IMPORTANT SERVICE WORKER FACTS:**
+- The service worker filename can be ANYTHING (e.g., sw.js, service-worker.js, my-sw.js) - there is NO required filename
+- The ONLY requirement is: the file must be PUBLICLY ACCESSIBLE (no 403/404 errors when visiting the URL)
+- For 403 errors: The file exists but server is blocking access (permissions issue)
+- For 404 errors: The file doesn't exist at that path
+- DO NOT tell users the filename is "wrong" - only tell them the file is not accessible
+- The path in PushEngage config (siteSettings.service_worker.worker) must match where the actual file is hosted
+
+${DASHBOARD_NAVIGATION_RULES}
+
+## PUSHENGAGE DASHBOARD DOCUMENTATION
+
+${PUSHENGAGE_DASHBOARD_DOCS}
 `;
 
   // Debug mode - with or without selected error
